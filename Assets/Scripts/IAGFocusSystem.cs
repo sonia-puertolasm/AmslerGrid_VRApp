@@ -6,7 +6,7 @@ public class IAGFocusSystem : MonoBehaviour
     private Transform gridParent;
     private Transform probeParent;
 
-    private float focusSquareSize = 3.5f;
+    private float focusSquareSize = 1.5f;
     private float lineWidth = 0.02f;
     private Color focusLineColor = Color.white;
     private Color boundaryColor = Color.gray;
