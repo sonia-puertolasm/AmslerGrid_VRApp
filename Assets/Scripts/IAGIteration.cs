@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class IAGIteration : MonoBehaviour
 {
@@ -11,17 +12,19 @@ public class IAGIteration : MonoBehaviour
     private const int iteration1_probecount = 8;
     private const int iterationhigher_probecount = 9;
 
-    private float probeDotSize = 0.2f;
-    private Color probeDefaultColor = Color.black;
-    private Color probeSelectedColor = Color.yellow;
-    private Color probeIt1Color = Color.blue;
-    private Color probeHigherItColor = Color.green;
+    private const int maxIterations = 3;
 
+    private float probeDotSize = 0.2f;
     private float moveSpeed = 2f;
 
     private List<GameObject> iteration1Probes = new List<GameObject>();
     private List<GameObject> iterationcurrentProbes = new List<GameObject>();
 
+    private class ProbeState
+    {
+        public Vector3 position;
+        public bool isCompleted;
+    }
     private class IterationState
     {
         public int iteration;
@@ -29,6 +32,7 @@ public class IAGIteration : MonoBehaviour
         public GameObject selectedProbe;
         public HashSet<int> completedIndices;
         public int completedCount;
+        public Dictionary<int, ProbeState> probePositions;
     }
 
     private Stack<IterationState> iterationHistory = new Stack<IterationState>();
@@ -42,6 +46,7 @@ public class IAGIteration : MonoBehaviour
     private GameObject currentCenterProbe = null;
 
     private bool isSelectingRegion = false;
+    private bool canSelectCenter = false;
 
     void Start()
     {
@@ -93,6 +98,7 @@ public class IAGIteration : MonoBehaviour
         completedProbeIndices.Clear();
         isSelectingRegion = false;
         selectedProbeIndex = -1;
+        canSelectCenter = false;
 
         CreateIteration1Probes();
         iterationcurrentProbes = iteration1Probes;
@@ -135,16 +141,35 @@ public class IAGIteration : MonoBehaviour
 
     private void StartHigherIteration(GameObject centerProbe)
     {
+        if (currentIteration >= maxIterations)
+        {
+            return;
+        }
+
+        Dictionary<int, ProbeState> currentProbePositions = new Dictionary<int, ProbeState>();
+
+        for (int i = 0; i < iterationcurrentProbes.Count; i++)
+        {
+            GameObject probe = iterationcurrentProbes[i];
+            currentProbePositions[i] = new ProbeState
+            {
+                position = probe.transform.position,
+                isCompleted = completedProbeIndices.Contains(i)
+            };
+        }
+
         IterationState currentState = new IterationState
         {
             iteration = currentIteration,
             probes = new List<GameObject>(iterationcurrentProbes),
             selectedProbe = centerProbe,
             completedIndices = new HashSet<int>(completedProbeIndices),
-            completedCount = completedProbeCount
+            completedCount = completedProbeCount,
+            probePositions = currentProbePositions
         };
+
         iterationHistory.Push(currentState);
-        
+
         currentIteration++;
         completedProbeCount = 0;
         completedProbeIndices.Clear();
@@ -155,20 +180,14 @@ public class IAGIteration : MonoBehaviour
         {
             selectedIteration1Probe = centerProbe;
         }
-            
 
         foreach (var probe in iterationcurrentProbes)
         {
-            if (probe == centerProbe)
-            {
-                probe.GetComponent<Renderer>().material.color = Color.black;
-                probe.SetActive(true);
-            }
-            else
-            {
-                probe.SetActive(false);
-            }
+            probe.SetActive(false);
         }
+
+        centerProbe.SetActive(true);
+        centerProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
 
         currentCenterProbe = centerProbe;
        
@@ -210,7 +229,9 @@ public class IAGIteration : MonoBehaviour
         probe.transform.SetParent(transform);
         probe.transform.localScale = Vector3.one * probeDotSize;
         probe.transform.position = new Vector3(x, y, z);
-        probe.GetComponent<Renderer>().material.color = probeDefaultColor;
+
+        Color initialColor = currentIteration > 1 ? ProbeColors.InactiveHigherIt : ProbeColors.Default;
+        probe.GetComponent<Renderer>().material.color = initialColor;
 
         return probe;
     }
@@ -224,7 +245,7 @@ public class IAGIteration : MonoBehaviour
 
             if (Physics.Raycast(ray, out hit))
             {
-                if (currentCenterProbe != null && hit.collider.gameObject == currentCenterProbe)
+                if (currentCenterProbe != null && hit.collider.gameObject == currentCenterProbe && canSelectCenter)
                 {
                     GoForward1Iteration();
                     return;
@@ -249,21 +270,21 @@ public class IAGIteration : MonoBehaviour
         if (selectedProbeIndex >= 0 && selectedProbeIndex < iterationcurrentProbes.Count)
         {
             Renderer prevRenderer = iterationcurrentProbes[selectedProbeIndex].GetComponent<Renderer>();
-            Color completedColor = currentIteration == 1 ? probeIt1Color : probeHigherItColor;
 
             if (completedProbeIndices.Contains(selectedProbeIndex))
             {
-                prevRenderer.material.color = completedColor;
+                prevRenderer.material.color = ProbeColors.Completed;
             }
             else
             {
-                prevRenderer.material.color = probeDefaultColor;
+                Color inactiveColor = currentIteration > 1 ? ProbeColors.InactiveHigherIt : ProbeColors.Default;
+                prevRenderer.material.color = inactiveColor;
             }
         }
 
         selectedProbeIndex = index;
 
-        iterationcurrentProbes[selectedProbeIndex].GetComponent<Renderer>().material.color = probeSelectedColor;
+        iterationcurrentProbes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Selected;
 
         if (focusSystem != null)
         {
@@ -310,11 +331,9 @@ public class IAGIteration : MonoBehaviour
             GameObject currentProbe = iterationcurrentProbes[selectedProbeIndex];
             Renderer probeRenderer = currentProbe.GetComponent<Renderer>();
 
-            Color completedColor = currentIteration == 1 ? probeIt1Color : probeHigherItColor;
-
             bool wasAlreadyCompleted = completedProbeIndices.Contains(selectedProbeIndex);
 
-            probeRenderer.material.color = completedColor;
+            probeRenderer.material.color = ProbeColors.Completed;
 
             if (!wasAlreadyCompleted)
             {
@@ -344,7 +363,8 @@ public class IAGIteration : MonoBehaviour
 
             if (selectedProbeIndex >= 0)
             {
-                iterationcurrentProbes[selectedProbeIndex].GetComponent<Renderer>().material.color = probeDefaultColor;
+                Color inactiveColor = currentIteration > 1 ? ProbeColors.InactiveHigherIt : ProbeColors.Default;
+                iterationcurrentProbes[selectedProbeIndex].GetComponent<Renderer>().material.color = inactiveColor;
                 selectedProbeIndex = -1;
             }
 
@@ -366,13 +386,9 @@ public class IAGIteration : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Backspace))
         {
-            if (currentIteration > 1 && !isSelectingRegion)
+            if (currentIteration > 1 && !isSelectingRegion && !focusSystem.IsFocused())
             {
                 GoBack1Iteration();
-            }
-            else
-            {
-                return;
             }
         }
     }
@@ -390,22 +406,22 @@ public class IAGIteration : MonoBehaviour
         {
             foreach (var probe in iteration1Probes)
             {
-                probe.GetComponent<Renderer>().material.color = Color.cyan;
+                probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
                 probe.SetActive(true);
             }
         }
 
         else
         {
-            foreach (var probe in iterationcurrentProbes)
-            {
-                probe.GetComponent<Renderer>().material.color = Color.cyan;
-                probe.SetActive(true);
-            }
-
             if (selectedIteration1Probe != null)
             {
-                selectedIteration1Probe.SetActive(true);
+                selectedIteration1Probe.SetActive(false);
+            }
+
+            foreach (var probe in iterationcurrentProbes)
+            {
+                probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
+                probe.SetActive(true);
             }
         }
     }
@@ -455,13 +471,11 @@ public class IAGIteration : MonoBehaviour
     {
         isSelectingRegion = false;
 
-        Color completedColor = currentIteration == 1 ? probeIt1Color : probeHigherItColor;
-
         if (currentIteration == 1)
         {
             foreach (var probe in iteration1Probes)
             {
-                probe.GetComponent<Renderer>().material.color = completedColor;
+                probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
                 probe.SetActive(true);
             }
         }
@@ -510,20 +524,43 @@ public class IAGIteration : MonoBehaviour
         completedProbeIndices = previousState.completedIndices;
         completedProbeCount = previousState.completedCount;
         currentCenterProbe = previousState.selectedProbe;
+        canSelectCenter = false;
         selectedProbeIndex = -1;
-        isSelectingRegion = false;
+        isSelectingRegion = true;
+
+        if (previousState.probePositions != null)
+        {
+            foreach (var entry in previousState.probePositions)
+            {
+                int index = entry.Key;
+                ProbeState state = entry.Value;
+
+                if (index < iterationcurrentProbes.Count)
+                {
+                    GameObject probe = iterationcurrentProbes[index];
+                    probe.transform.position = state.position;
+
+                    probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
+
+                    if (state.isCompleted && !completedProbeIndices.Contains(index))
+                    {
+                        completedProbeIndices.Add(index);  
+                    }
+                }
+            }
+        }
 
         foreach (var probe in iterationcurrentProbes)
         {
             probe.SetActive(true);
+            probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
         }
 
         if (currentCenterProbe != null)
         {
             currentCenterProbe.SetActive(true);
-            currentCenterProbe.GetComponent<Renderer>().material.color = Color.magenta;
+            currentCenterProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
         }
-        
     }
 
     private void GoForward1Iteration()

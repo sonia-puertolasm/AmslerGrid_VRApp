@@ -5,11 +5,7 @@ using UnityEngine;
 public class ProbeDots : MonoBehaviour
 {
     private float probeDotSize = 0.2f;
-    private Color probeDefaultColor = Color.grey;
-    private Color probeSelectedColor = Color.green;
-    private Color probeCompletedColor = Color.yellow;
     private int probeSpacing = 2;
-
     private float moveSpeed = 2f;
 
     private MainGrid mainGrid;
@@ -83,7 +79,7 @@ public class ProbeDots : MonoBehaviour
                 probe.transform.localScale = Vector3.one * probeDotSize;
                 probe.transform.position = new Vector3(worldX, worldY, gridCenter.z - 0.15f);
 
-                probe.GetComponent<Renderer>().material.color = probeDefaultColor;
+                probe.GetComponent<Renderer>().material.color = ProbeColors.Default;
 
                 probes.Add(probe);
             }
@@ -155,11 +151,11 @@ public class ProbeDots : MonoBehaviour
 
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
         {
-            probes[selectedProbeIndex].GetComponent<Renderer>().material.color = probeDefaultColor;
+            probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Default;
         }
 
         selectedProbeIndex = index;
-        probes[selectedProbeIndex].GetComponent<Renderer>().material.color = probeSelectedColor;
+        probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Selected;
 
         if (focusSystem != null)
         {
@@ -171,7 +167,7 @@ public class ProbeDots : MonoBehaviour
     {
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
         {
-            probes[selectedProbeIndex].GetComponent<Renderer>().material.color = probeCompletedColor;
+            probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed;
         }
         selectedProbeIndex = -1;
     }

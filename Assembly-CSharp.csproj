@@ -10,7 +10,7 @@
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <RootNamespace></RootNamespace>
-    <ProjectGuid>{10AFC618-1F95-5F2C-E2CF-85A277327381}</ProjectGuid>
+    <ProjectGuid>{01EAFBD6-07EB-E013-9C93-0D8DE333E71A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>Assembly-CSharp</AssemblyName>
@@ -64,6 +64,7 @@
     <Compile Include="Assets\Scripts\IAGIteration.cs" />
     <Compile Include="Assets\Scripts\ProbeDots.cs" />
     <Compile Include="Assets\Scripts\IAGFocusSystem.cs" />
+    <Compile Include="Assets\Scripts\ProbeColors.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>
