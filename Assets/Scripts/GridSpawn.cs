@@ -6,7 +6,7 @@ public class MainGrid : MonoBehaviour
 {
     private int gridSize = 8;
     private float totalGridWidth = 10f;
-    private float lineWidth = 0.15f;  // Made thicker so it's visible
+    private float lineWidth = 0.15f;  
     private Color lineColor = Color.white;
 
     private float centerDotSize = 0.3f;
@@ -59,7 +59,6 @@ public class MainGrid : MonoBehaviour
         float cellSize = totalGridWidth / gridSize;
         float halfWidth = totalGridWidth / 2f;
 
-        // Draw horizontal lines
         for (int i = 0; i < numLines; i++)
         {
             float y = i * cellSize - halfWidth + gridCenterPosition.y;
@@ -68,7 +67,6 @@ public class MainGrid : MonoBehaviour
             line.transform.SetParent(transform);
             LineRenderer lr = line.AddComponent<LineRenderer>();
 
-            // Use the shader that works: Unlit/Color
             lr.material = new Material(Shader.Find("Unlit/Color"));
             lr.material.color = lineColor;
             lr.startColor = lineColor;
@@ -86,7 +84,6 @@ public class MainGrid : MonoBehaviour
             allLines.Add(line);
         }
 
-        // Draw vertical lines
         for (int i = 0; i < numLines; i++)
         {
             float x = i * cellSize - halfWidth + gridCenterPosition.x;
@@ -95,7 +92,6 @@ public class MainGrid : MonoBehaviour
             line.transform.SetParent(transform);
             LineRenderer lr = line.AddComponent<LineRenderer>();
 
-            // Use the shader that works: Unlit/Color
             lr.material = new Material(Shader.Find("Unlit/Color"));
             lr.material.color = lineColor;
             lr.startColor = lineColor;

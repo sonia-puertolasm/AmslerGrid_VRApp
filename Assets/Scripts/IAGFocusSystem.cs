@@ -5,18 +5,9 @@ public class IAGFocusSystem : MonoBehaviour
 {
     private Transform gridParent;
     private Transform probeParent;
-
-    private float focusSquareSize = 1.5f;
-    private float lineWidth = 0.02f;
-    private Color focusLineColor = Color.white;
-    private Color boundaryColor = Color.gray;
-
-    private Material focusLineMaterial;
+    private MainGrid mainGrid;
 
     private GameObject selectedProbe = null;
-    private GameObject focusVisualizationParent = null;
-    private GameObject focusSquare = null;
-    private List<GameObject> focusCrossLines = new List<GameObject>();
     private bool isFocused = false;
 
     private int currentIteration = 1;
@@ -48,16 +39,14 @@ public class IAGFocusSystem : MonoBehaviour
             currentIteration = 2;
         }
 
-        HideAllGridLines();
+        HideAllGridLinesExceptFocusArea(probe.transform.position);
         HideAllProbesExcept(probe);
-        CreateFocusVisualization(probe.transform.position);
     }
 
     public void ExitFocusMode()
     {
         if (!isFocused) return;
 
-        DestroyFocusVisualization();
         RestoreGridVisibility();
         RestoreProbeVisibility();
 
@@ -65,14 +54,46 @@ public class IAGFocusSystem : MonoBehaviour
         isFocused = false;
     }
 
-    void HideAllGridLines()
+    void HideAllGridLinesExceptFocusArea(Vector3 probePosition)
     {
         if (gridParent == null)
         {
             return;
         }
 
+        if (mainGrid == null)
+        {
+            mainGrid = gridParent.GetComponent<MainGrid>();
+            if (mainGrid == null) return;
+        }
+
         originalGridVisibility.Clear();
+
+        float cellSize = mainGrid.CellSize;
+        float halfWidth = mainGrid.TotalGridWidth / 2f;
+        Vector3 gridCenter = mainGrid.GridCenterPosition;
+
+        float localX = probePosition.x - gridCenter.x + halfWidth;
+        float localY = probePosition.y - gridCenter.y + halfWidth;
+        int probeCellX = Mathf.FloorToInt(localX / cellSize);
+        int probeCellY = Mathf.FloorToInt(localY / cellSize);
+
+        int minCellX = Mathf.Max(0, probeCellX - 1);
+        int maxCellX = Mathf.Min(mainGrid.GridSize, probeCellX + 2);
+        int minCellY = Mathf.Max(0, probeCellY - 1);
+        int maxCellY = Mathf.Min(mainGrid.GridSize, probeCellY + 2);
+
+        HashSet<int> visibleHLines = new HashSet<int>();
+        HashSet<int> visibleVLines = new HashSet<int>();
+
+        for (int i = minCellY; i <= maxCellY; i++)
+        {
+            visibleHLines.Add(i);
+        }
+        for (int i = minCellX; i <= maxCellX; i++)
+        {
+            visibleVLines.Add(i);
+        }
 
         foreach (Transform child in gridParent)
         {
@@ -81,16 +102,30 @@ public class IAGFocusSystem : MonoBehaviour
                 continue;
             }
 
+            bool shouldBeVisible = false;
+
+
+            if (child.name.StartsWith("HLine_"))
+            {
+                int lineIndex = int.Parse(child.name.Replace("HLine_", ""));
+                shouldBeVisible = visibleHLines.Contains(lineIndex);
+            }
+            else if (child.name.StartsWith("VLine_"))
+            {
+                int lineIndex = int.Parse(child.name.Replace("VLine_", ""));
+                shouldBeVisible = visibleVLines.Contains(lineIndex);
+            }
+
             LineRenderer lr = child.GetComponent<LineRenderer>();
             if (lr != null)
             {
                 originalGridVisibility[child.gameObject] = lr.enabled;
-                lr.enabled = false;
+                lr.enabled = shouldBeVisible;
             }
             else
             {
                 originalGridVisibility[child.gameObject] = child.gameObject.activeSelf;
-                child.gameObject.SetActive(false);
+                child.gameObject.SetActive(shouldBeVisible);
             }
         }
     }
@@ -111,88 +146,6 @@ public class IAGFocusSystem : MonoBehaviour
         }
     }
 
-    void CreateFocusVisualization(Vector3 probePosition)
-    {
-        focusVisualizationParent = new GameObject("FocusVisualization");
-        focusVisualizationParent.transform.position = probePosition;
-        focusVisualizationParent.transform.parent = transform;
-
-        float halfSize = focusSquareSize / 2f;
-        Vector3 topLeft = probePosition + new Vector3(-halfSize, halfSize, 0);
-        Vector3 topRight = probePosition + new Vector3(halfSize, halfSize, 0);
-        Vector3 bottomLeft = probePosition + new Vector3(-halfSize, -halfSize, 0);
-        Vector3 bottomRight = probePosition + new Vector3(halfSize, -halfSize, 0);
-
-        focusSquare = CreateSquareBoundary(topLeft, topRight, bottomLeft, bottomRight, focusVisualizationParent.transform);
-
-        CreateCrossLine(
-            probePosition + new Vector3(-halfSize, 0, 0),
-            probePosition + new Vector3(halfSize, 0, 0),
-            focusVisualizationParent.transform
-        );
-
-        CreateCrossLine(
-            probePosition + new Vector3(0, -halfSize, 0),
-            probePosition + new Vector3(0, halfSize, 0),
-            focusVisualizationParent.transform
-        );
-    }
-
-    GameObject CreateSquareBoundary(Vector3 topLeft, Vector3 topRight, Vector3 bottomLeft, Vector3 bottomRight, Transform parent)
-    {
-        GameObject square = new GameObject("FocusSquare");
-        square.transform.parent = parent;
-
-        LineRenderer lr = square.AddComponent<LineRenderer>();
-        lr.material = focusLineMaterial != null ? focusLineMaterial : new Material(Shader.Find("Sprites/Default"));
-        lr.startColor = boundaryColor;
-        lr.endColor = boundaryColor;
-        lr.startWidth = lineWidth * 1.5f;
-        lr.endWidth = lineWidth * 1.5f;
-        lr.positionCount = 5;
-        lr.loop = true;
-        lr.useWorldSpace = true;
-
-        lr.SetPosition(0, bottomLeft);
-        lr.SetPosition(1, bottomRight);
-        lr.SetPosition(2, topRight);
-        lr.SetPosition(3, topLeft);
-        lr.SetPosition(4, bottomLeft);
-
-        return square;
-    }
-
-    void CreateCrossLine(Vector3 start, Vector3 end, Transform parent)
-    {
-        GameObject lineObj = new GameObject("CrossLine");
-        lineObj.transform.parent = parent;
-
-        LineRenderer lr = lineObj.AddComponent<LineRenderer>();
-        lr.material = focusLineMaterial != null ? focusLineMaterial : new Material(Shader.Find("Sprites/Default"));
-        lr.startColor = focusLineColor;
-        lr.endColor = focusLineColor;
-        lr.startWidth = lineWidth;
-        lr.endWidth = lineWidth;
-        lr.positionCount = 2;
-        lr.useWorldSpace = true;
-
-        lr.SetPosition(0, start);
-        lr.SetPosition(1, end);
-
-        focusCrossLines.Add(lineObj);
-    }
-
-    void DestroyFocusVisualization()
-    {
-        if (focusSquare != null)
-        {
-            Destroy(focusVisualizationParent);
-            focusVisualizationParent = null;
-        }
-
-        focusSquare = null;
-        focusCrossLines.Clear();
-    }
 
     void RestoreGridVisibility()
     {
@@ -228,10 +181,9 @@ public class IAGFocusSystem : MonoBehaviour
 
     public void UpdateFocusPosition(Vector3 newPosition)
     {
-        if (!isFocused || focusVisualizationParent == null) return;
+        if (!isFocused) return;
 
-        DestroyFocusVisualization();
-        CreateFocusVisualization(newPosition);
+        HideAllGridLinesExceptFocusArea(newPosition);
     }
 
     public bool IsFocused()

@@ -62,9 +62,11 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\GridDeformation.cs" />
     <Compile Include="Assets\Scripts\IAGIteration.cs" />
+    <Compile Include="Assets\Scripts\ProbeDotConstraints.cs" />
     <Compile Include="Assets\Scripts\ProbeDots.cs" />
     <Compile Include="Assets\Scripts\IAGFocusSystem.cs" />
     <Compile Include="Assets\Scripts\ProbeColors.cs" />
+    <Compile Include="Assets\Scripts\DisplacementTracker.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>
