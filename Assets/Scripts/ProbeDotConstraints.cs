@@ -7,9 +7,9 @@ using Vector2 = UnityEngine.Vector2;
 
 public class ProbeDotConstraints : MonoBehaviour
 {
-    [Header("Constraint Settings")]
-    [SerializeField] private float neighborDistanceMultiplier = 1.5f;
-    [SerializeField] private float boundaryPadding = 0.1f;
+    
+    private float neighborDistanceMultiplier = 1.5f;
+    private float boundaryPadding = 0.1f;
     
     private MainGrid mainGrid;
     private float minX, maxX, minY, maxY;
@@ -67,26 +67,27 @@ public class ProbeDotConstraints : MonoBehaviour
 
         foreach (Vector3 neighbor in neighbors)
         {
-            if (!IsSameIteration(neighbor, currentIteration))
-            {
-                continue;
-            }
-        
-            Vector2 proposedPos2D = new Vector2(proposedPos.x, proposedPos.y);
+            Vector2 constrainedPos2D = new Vector2(constrainedPos.x, constrainedPos.y);
             Vector2 neighbor2D = new Vector2(neighbor.x, neighbor.y);
-            float distance = Vector2.Distance(proposedPos2D, neighbor2D);
+            float distance = Vector2.Distance(constrainedPos2D, neighbor2D);
 
-            float minDistance = 0.2f; 
+            float minDistance = 0.1f;
 
             if (distance < minDistance)
             {
-                Vector2 direction = (proposedPos2D - neighbor2D).normalized;
+                Vector2 direction = (constrainedPos2D - neighbor2D).normalized;
+
+                if (direction.magnitude < 0.001f)
+                {
+                    direction = Vector2.up;
+                }
+
                 Vector2 minPos2D = neighbor2D + direction * minDistance;
                 constrainedPos = new Vector3(minPos2D.x, minPos2D.y, proposedPos.z);
             }
             else if (distance > maxDistance)
             {
-                Vector2 direction = (proposedPos2D - neighbor2D).normalized;
+                Vector2 direction = (constrainedPos2D - neighbor2D).normalized;
                 Vector2 maxPos2D = neighbor2D + direction * maxDistance;
                 constrainedPos = new Vector3(maxPos2D.x, maxPos2D.y, proposedPos.z);
             }
@@ -107,9 +108,4 @@ public class ProbeDotConstraints : MonoBehaviour
         return normalSpacing * neighborDistanceMultiplier;
     }
 
-    private bool IsSameIteration(Vector3 neighbor, int currentIteration)
-    {
-        string neighborName = neighbor.ToString();
-        return neighborName.Contains($"Iter{currentIteration}_");
-    }
 }

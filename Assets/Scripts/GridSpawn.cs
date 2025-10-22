@@ -55,59 +55,77 @@ public class MainGrid : MonoBehaviour
 
     void DrawGrid()
     {
-        int numLines = gridSize + 1;
+        // Create parent GameObject for all lines
+        GameObject gridLinesParent = new GameObject("GridLines");
+        gridLinesParent.transform.SetParent(transform);
+        gridLinesParent.transform.localPosition = Vector3.zero;
+
         float cellSize = totalGridWidth / gridSize;
         float halfWidth = totalGridWidth / 2f;
 
-        for (int i = 0; i < numLines; i++)
+        // Calculate bottom-left origin (keeping grid centered at gridCenterPosition)
+        Vector3 origin = new Vector3(
+            gridCenterPosition.x - halfWidth,
+            gridCenterPosition.y - halfWidth,
+            gridCenterPosition.z
+        );
+
+        int rows = gridSize;
+        int cols = gridSize;
+
+        // Nested loops: i = row, k = col
+        for (int i = 0; i < rows; i++)
         {
-            float y = i * cellSize - halfWidth + gridCenterPosition.y;
+            for (int k = 0; k < cols; k++)
+            {
+                // Calculate corner positions for cell (i, k)
+                Vector3 BL = origin + new Vector3(k * cellSize, i * cellSize, 0);
+                Vector3 BR = origin + new Vector3((k + 1) * cellSize, i * cellSize, 0);
+                Vector3 TL = origin + new Vector3(k * cellSize, (i + 1) * cellSize, 0);
+                Vector3 TR = origin + new Vector3((k + 1) * cellSize, (i + 1) * cellSize, 0);
 
-            GameObject line = new GameObject("HLine_" + i);
-            line.transform.SetParent(transform);
-            LineRenderer lr = line.AddComponent<LineRenderer>();
+                // Always create TOP edge (TL -> TR)
+                CreateLine($"Line_r{i}_c{k}_TOP", TL, TR, gridLinesParent.transform);
 
-            lr.material = new Material(Shader.Find("Unlit/Color"));
-            lr.material.color = lineColor;
-            lr.startColor = lineColor;
-            lr.endColor = lineColor;
-            lr.startWidth = lineWidth;
-            lr.endWidth = lineWidth;
-            lr.useWorldSpace = true;
-            lr.numCapVertices = 5;
-            lr.numCornerVertices = 5;
-            lr.positionCount = 2;
+                // Always create RIGHT edge (BR -> TR)
+                CreateLine($"Line_r{i}_c{k}_RIGHT", BR, TR, gridLinesParent.transform);
 
-            lr.SetPosition(0, new Vector3(-halfWidth + gridCenterPosition.x, y, gridCenterPosition.z));
-            lr.SetPosition(1, new Vector3(halfWidth + gridCenterPosition.x, y, gridCenterPosition.z));
+                // If bottom row (i == 0), create BOTTOM edge (BL -> BR)
+                if (i == 0)
+                {
+                    CreateLine($"Line_r{i}_c{k}_BOTTOM", BL, BR, gridLinesParent.transform);
+                }
 
-            allLines.Add(line);
+                // If leftmost column (k == 0), create LEFT edge (BL -> TL)
+                if (k == 0)
+                {
+                    CreateLine($"Line_r{i}_c{k}_LEFT", BL, TL, gridLinesParent.transform);
+                }
+            }
         }
+    }
 
-        for (int i = 0; i < numLines; i++)
-        {
-            float x = i * cellSize - halfWidth + gridCenterPosition.x;
+    private void CreateLine(string name, Vector3 start, Vector3 end, Transform parent)
+    {
+        GameObject line = new GameObject(name);
+        line.transform.SetParent(parent);
+        LineRenderer lr = line.AddComponent<LineRenderer>();
 
-            GameObject line = new GameObject("VLine_" + i);
-            line.transform.SetParent(transform);
-            LineRenderer lr = line.AddComponent<LineRenderer>();
+        lr.material = new Material(Shader.Find("Unlit/Color"));
+        lr.material.color = lineColor;
+        lr.startColor = lineColor;
+        lr.endColor = lineColor;
+        lr.startWidth = lineWidth;
+        lr.endWidth = lineWidth;
+        lr.useWorldSpace = true;
+        lr.numCapVertices = 5;
+        lr.numCornerVertices = 5;
+        lr.positionCount = 2;
 
-            lr.material = new Material(Shader.Find("Unlit/Color"));
-            lr.material.color = lineColor;
-            lr.startColor = lineColor;
-            lr.endColor = lineColor;
-            lr.startWidth = lineWidth;
-            lr.endWidth = lineWidth;
-            lr.useWorldSpace = true;
-            lr.numCapVertices = 5;
-            lr.numCornerVertices = 5;
-            lr.positionCount = 2;
+        lr.SetPosition(0, start);
+        lr.SetPosition(1, end);
 
-            lr.SetPosition(0, new Vector3(x, -halfWidth + gridCenterPosition.y, gridCenterPosition.z));
-            lr.SetPosition(1, new Vector3(x, halfWidth + gridCenterPosition.y, gridCenterPosition.z));
-
-            allLines.Add(line);
-        }
+        allLines.Add(line);
     }
     private void DrawCenterDot()
     {

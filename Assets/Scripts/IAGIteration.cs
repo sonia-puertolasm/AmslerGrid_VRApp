@@ -156,76 +156,75 @@ public class IAGIteration : MonoBehaviour
     }
 
     private void StartHigherIteration(GameObject centerProbe)
-{
-    Dictionary<int, ProbeState> currentProbePositions = new Dictionary<int, ProbeState>();
-
-    for (int i = 0; i < iterationcurrentProbes.Count; i++)
     {
-        GameObject probe = iterationcurrentProbes[i];
-        currentProbePositions[i] = new ProbeState
+        if (currentCenterProbe != null)
         {
-            position = probe.transform.position,
-            isCompleted = completedProbeIndices.Contains(i)
+            currentCenterProbe.SetActive(false);
+        }
+
+        Dictionary<int, ProbeState> currentProbePositions = new Dictionary<int, ProbeState>();
+
+        for (int i = 0; i < iterationcurrentProbes.Count; i++)
+        {
+            GameObject probe = iterationcurrentProbes[i];
+            currentProbePositions[i] = new ProbeState
+            {
+                position = probe.transform.position,
+                isCompleted = completedProbeIndices.Contains(i)
+            };
+        }
+
+        IterationState currentState = new IterationState
+        {
+            iteration = currentIteration,
+            probes = new List<GameObject>(iterationcurrentProbes),
+            selectedProbe = currentCenterProbe,
+            completedIndices = new HashSet<int>(completedProbeIndices),
+            completedCount = completedProbeCount,
+            probePositions = currentProbePositions
         };
+
+        iterationHistory.Push(currentState);
+
+        currentIteration++;
+        completedProbeCount = 0;
+        completedProbeIndices.Clear();
+        isSelectingRegion = false;
+        selectedProbeIndex = -1;
+
+        if (currentIteration == 2)
+        {
+            selectedIteration1Probe = centerProbe;
+        }
+
+        foreach (var probe in iterationcurrentProbes)
+        {
+            probe.SetActive(false);
+        }
+
+        centerProbe.SetActive(true);
+        centerProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
+
+        currentCenterProbe = centerProbe;
+
+        if (iterationProbes.ContainsKey(currentIteration))
+        {
+            RestoreExistingIterationProbes(currentIteration);
+        }
+        else
+        {
+            CreateHigherIterationProbes(centerProbe.transform.position);
+            iterationProbes[currentIteration] = new List<GameObject>(iterationcurrentProbes);
+        }
     }
-
-    IterationState currentState = new IterationState
-    {
-        iteration = currentIteration,
-        probes = new List<GameObject>(iterationcurrentProbes),
-        selectedProbe = centerProbe,
-        completedIndices = new HashSet<int>(completedProbeIndices),
-        completedCount = completedProbeCount,
-        probePositions = currentProbePositions // Save positions
-    };
-
-    iterationHistory.Push(currentState);
-
-    currentIteration++;
-    completedProbeCount = 0;
-    completedProbeIndices.Clear();
-    isSelectingRegion = false;
-    selectedProbeIndex = -1;
-
-    if (currentIteration == 2)
-    {
-        selectedIteration1Probe = centerProbe;
-    }
-
-    foreach (var probe in iterationcurrentProbes)
-    {
-        probe.SetActive(false);
-    }
-
-    centerProbe.SetActive(true);
-    centerProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
-
-    currentCenterProbe = centerProbe;
-
-    // Check if probes for this iteration already exist
-    if (iterationProbes.ContainsKey(currentIteration))
-    {
-        // Restore existing probes
-        RestoreExistingIterationProbes(currentIteration);
-    }
-    else
-    {
-        // Create new probes and store them
-        CreateHigherIterationProbes(centerProbe.transform.position);
-        iterationProbes[currentIteration] = new List<GameObject>(iterationcurrentProbes);
-    }
-}
 
     private void RestoreExistingIterationProbes(int iteration)
     {
-        // Get the existing probes for this iteration
         iterationcurrentProbes = iterationProbes[iteration];
 
-        // Reactivate all probes with their preserved positions and colors
         foreach (var probe in iterationcurrentProbes)
         {
             probe.SetActive(true);
-            // Probes retain their displaced positions because they're the same GameObjects
         }
     }
 
@@ -273,6 +272,12 @@ public class IAGIteration : MonoBehaviour
 
     private void HandleProbeSelection()
     {
+
+        if (focusSystem != null && focusSystem.IsFocused())
+        {
+            return;
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -291,7 +296,7 @@ public class IAGIteration : MonoBehaviour
                     if (hit.collider.gameObject == iterationcurrentProbes[i])
                     {
                         SelectProbe(i);
-                        break;
+                        return;
                     }
                 }
             }
@@ -542,6 +547,12 @@ public class IAGIteration : MonoBehaviour
 
             foreach (var probe in iterationcurrentProbes)
             {
+                if (probe == currentCenterProbe)
+                {
+                    probe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
+                    continue;
+                }
+
                 probe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
                 probe.SetActive(true);
             }
@@ -549,9 +560,9 @@ public class IAGIteration : MonoBehaviour
             if (currentCenterProbe != null)
             {
                 currentCenterProbe.SetActive(true);
-                currentCenterProbe.GetComponent<Renderer>().material.color = ProbeColors.Completed;
+                currentCenterProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt; 
             }
-        }
+    }
     }
 
     private void HandleRegionSelection()
@@ -576,15 +587,9 @@ public class IAGIteration : MonoBehaviour
                 }
                 else
                 {
-                    if (currentCenterProbe != null && hit.collider.gameObject == currentCenterProbe)
-                    {
-                        OnRegionSelected(currentCenterProbe);
-                        return;
-                    }
-
                     for (int i = 0; i < iterationcurrentProbes.Count; i++)
                     {
-                        if (hit.collider.gameObject == iterationcurrentProbes[i])
+                        if (hit.collider.gameObject == iterationcurrentProbes[i] && hit.collider.gameObject != currentCenterProbe)
                         {
                             OnRegionSelected(iterationcurrentProbes[i]);
                             return;

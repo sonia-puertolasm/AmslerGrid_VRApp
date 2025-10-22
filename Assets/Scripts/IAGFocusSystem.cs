@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 public class IAGFocusSystem : MonoBehaviour
 {
-    private Transform gridParent;
+    private Transform gridParent;  
+    private Transform gridLinesParent; 
     private Transform probeParent;
     private MainGrid mainGrid;
 
@@ -15,13 +16,8 @@ public class IAGFocusSystem : MonoBehaviour
     private Dictionary<GameObject, bool> originalGridVisibility = new Dictionary<GameObject, bool>();
     private Dictionary<GameObject, bool> originalProbeVisibility = new Dictionary<GameObject, bool>();
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Space) && isFocused)
-        {
-            ExitFocusMode();
-        }
-    }
+    private int focusedStartRow = -1;
+    private int focusedStartCol = -1;
 
     public void EnterFocusMode(GameObject probe)
     {
@@ -52,82 +48,134 @@ public class IAGFocusSystem : MonoBehaviour
 
         selectedProbe = null;
         isFocused = false;
+        focusedStartRow = -1;
+        focusedStartCol = -1;
     }
 
     void HideAllGridLinesExceptFocusArea(Vector3 probePosition)
     {
-        if (gridParent == null)
+        if (gridLinesParent == null)
         {
             return;
         }
 
         if (mainGrid == null)
         {
-            mainGrid = gridParent.GetComponent<MainGrid>();
-            if (mainGrid == null) return;
+            return;
         }
 
         originalGridVisibility.Clear();
 
         float cellSize = mainGrid.CellSize;
-        float halfWidth = mainGrid.TotalGridWidth / 2f;
+        int gridSize = mainGrid.GridSize;
+        float totalGridWidth = mainGrid.TotalGridWidth;
         Vector3 gridCenter = mainGrid.GridCenterPosition;
 
-        float localX = probePosition.x - gridCenter.x + halfWidth;
-        float localY = probePosition.y - gridCenter.y + halfWidth;
-        int probeCellX = Mathf.FloorToInt(localX / cellSize);
-        int probeCellY = Mathf.FloorToInt(localY / cellSize);
+        float halfWidth = totalGridWidth / 2f;
+        Vector3 origin = new Vector3(
+            gridCenter.x - halfWidth,
+            gridCenter.y - halfWidth,
+            gridCenter.z
+        );
 
-        int minCellX = Mathf.Max(0, probeCellX - 1);
-        int maxCellX = Mathf.Min(mainGrid.GridSize, probeCellX + 2);
-        int minCellY = Mathf.Max(0, probeCellY - 1);
-        int maxCellY = Mathf.Min(mainGrid.GridSize, probeCellY + 2);
+        int probeCol = Mathf.FloorToInt((probePosition.x - origin.x) / cellSize);
+        int probeRow = Mathf.FloorToInt((probePosition.y - origin.y) / cellSize);
 
-        HashSet<int> visibleHLines = new HashSet<int>();
-        HashSet<int> visibleVLines = new HashSet<int>();
+        probeCol = Mathf.Clamp(probeCol, 0, gridSize - 1);
+        probeRow = Mathf.Clamp(probeRow, 0, gridSize - 1);
 
-        for (int i = minCellY; i <= maxCellY; i++)
+        focusedStartCol = probeCol;
+        focusedStartRow = probeRow;
+
+
+        if (focusedStartCol + 2 > gridSize)
         {
-            visibleHLines.Add(i);
+            focusedStartCol = gridSize - 2;
         }
-        for (int i = minCellX; i <= maxCellX; i++)
+        if (focusedStartRow + 2 > gridSize)
         {
-            visibleVLines.Add(i);
+            focusedStartRow = gridSize - 2;
         }
 
-        foreach (Transform child in gridParent)
+        focusedStartCol = Mathf.Max(0, focusedStartCol);
+        focusedStartRow = Mathf.Max(0, focusedStartRow);
+
+
+        float minX = origin.x + focusedStartCol * cellSize;
+        float maxX = origin.x + (focusedStartCol + 2) * cellSize;
+        float minY = origin.y + focusedStartRow * cellSize;
+        float maxY = origin.y + (focusedStartRow + 2) * cellSize;
+
+        float epsilon = cellSize * 0.01f;
+
+        int visibleCount = 0;
+        int hiddenCount = 0;
+        int totalCount = 0;
+
+        foreach (Transform gridLine in gridLinesParent)
         {
-            if (child.name.Contains("CenterDot") || child.name == "CenterDot")
-            {
-                continue;
-            }
+            LineRenderer lr = gridLine.GetComponent<LineRenderer>();
+            if (lr == null) continue;
 
-            bool shouldBeVisible = false;
+            totalCount++;
 
+            Vector3 lineStart = lr.GetPosition(0);
+            Vector3 lineEnd = lr.GetPosition(1);
 
-            if (child.name.StartsWith("HLine_"))
-            {
-                int lineIndex = int.Parse(child.name.Replace("HLine_", ""));
-                shouldBeVisible = visibleHLines.Contains(lineIndex);
-            }
-            else if (child.name.StartsWith("VLine_"))
-            {
-                int lineIndex = int.Parse(child.name.Replace("VLine_", ""));
-                shouldBeVisible = visibleVLines.Contains(lineIndex);
-            }
+            bool isVisible = IsLineInFocusedRegion(lineStart, lineEnd, minX, maxX, minY, maxY, epsilon);
 
-            LineRenderer lr = child.GetComponent<LineRenderer>();
-            if (lr != null)
+            originalGridVisibility[gridLine.gameObject] = gridLine.gameObject.activeSelf;
+            gridLine.gameObject.SetActive(isVisible);
+
+            if (isVisible)
             {
-                originalGridVisibility[child.gameObject] = lr.enabled;
-                lr.enabled = shouldBeVisible;
+                visibleCount++;
             }
             else
             {
-                originalGridVisibility[child.gameObject] = child.gameObject.activeSelf;
-                child.gameObject.SetActive(shouldBeVisible);
+                hiddenCount++;
+
+                if (hiddenCount <= 3)
+                {
+                }
             }
         }
+    }
+
+    private bool IsLineInFocusedRegion(Vector3 lineStart, Vector3 lineEnd, float minX, float maxX, float minY, float maxY, float epsilon)
+    {
+        if (Mathf.Abs(lineStart.y - lineEnd.y) < epsilon)
+        {
+            float lineY = lineStart.y;
+            float lineMinX = Mathf.Min(lineStart.x, lineEnd.x);
+            float lineMaxX = Mathf.Max(lineStart.x, lineEnd.x);
+
+            bool yInRange = (Mathf.Abs(lineY - minY) < epsilon) ||
+                           (Mathf.Abs(lineY - (minY + maxY) / 2f) < epsilon) ||
+                           (Mathf.Abs(lineY - maxY) < epsilon);
+
+            bool xOverlaps = (lineMinX < maxX + epsilon) && (lineMaxX > minX - epsilon);
+
+            bool withinRegion = (lineMinX >= minX - epsilon && lineMaxX <= maxX + epsilon);
+
+            return yInRange && withinRegion;
+        }
+        else if (Mathf.Abs(lineStart.x - lineEnd.x) < epsilon)
+        {
+            float lineX = lineStart.x;
+            float lineMinY = Mathf.Min(lineStart.y, lineEnd.y);
+            float lineMaxY = Mathf.Max(lineStart.y, lineEnd.y);
+
+            bool xInRange = (Mathf.Abs(lineX - minX) < epsilon) ||
+                           (Mathf.Abs(lineX - (minX + maxX) / 2f) < epsilon) ||
+                           (Mathf.Abs(lineX - maxX) < epsilon);
+
+            bool withinRegion = (lineMinY >= minY - epsilon && lineMaxY <= maxY + epsilon);
+
+            return xInRange && withinRegion;
+        }
+
+        return false;
     }
 
     void HideAllProbesExcept(GameObject exception)
@@ -153,15 +201,7 @@ public class IAGFocusSystem : MonoBehaviour
         {
             if (kvp.Key != null)
             {
-                LineRenderer lr = kvp.Key.GetComponent<LineRenderer>();
-                if (lr != null)
-                {
-                    lr.enabled = kvp.Value;
-                }
-                else
-                {
-                    kvp.Key.SetActive(kvp.Value);
-                }
+                kvp.Key.SetActive(kvp.Value);
             }
         }
         originalGridVisibility.Clear();
@@ -182,8 +222,6 @@ public class IAGFocusSystem : MonoBehaviour
     public void UpdateFocusPosition(Vector3 newPosition)
     {
         if (!isFocused) return;
-
-        HideAllGridLinesExceptFocusArea(newPosition);
     }
 
     public bool IsFocused()
@@ -199,6 +237,18 @@ public class IAGFocusSystem : MonoBehaviour
     public void SetGridParent(Transform parent)
     {
         gridParent = parent;
+
+        Transform gridLinesChild = parent.Find("GridLines");
+        if (gridLinesChild != null)
+        {
+            gridLinesParent = gridLinesChild;
+        }
+        else
+        {
+            gridLinesParent = parent;
+        }
+
+        mainGrid = gridParent.GetComponent<MainGrid>();
     }
 
     public void SetProbeParent(Transform parent)
@@ -209,5 +259,35 @@ public class IAGFocusSystem : MonoBehaviour
     public void SetCurrentIteration(int iteration)
     {
         currentIteration = iteration;
+    }
+
+    public void GetFocusedRegionBounds(out int startRow, out int startCol, out int endRow, out int endCol)
+    {
+        startRow = focusedStartRow;
+        startCol = focusedStartCol;
+        endRow = focusedStartRow + 2;  
+        endCol = focusedStartCol + 2;
+    }
+
+    public void GetFocusedRegionWorldBounds(out Vector3 minBounds, out Vector3 maxBounds)
+    {
+        minBounds = Vector3.zero;
+        maxBounds = Vector3.zero;
+
+        if (mainGrid == null) return;
+
+        float cellSize = mainGrid.CellSize;
+        float totalGridWidth = mainGrid.TotalGridWidth;
+        Vector3 gridCenter = mainGrid.GridCenterPosition;
+        float halfWidth = totalGridWidth / 2f;
+
+        Vector3 origin = new Vector3(
+            gridCenter.x - halfWidth,
+            gridCenter.y - halfWidth,
+            gridCenter.z
+        );
+
+        minBounds = origin + new Vector3(focusedStartCol * cellSize, focusedStartRow * cellSize, 0);
+        maxBounds = origin + new Vector3((focusedStartCol + 2) * cellSize, (focusedStartRow + 2) * cellSize, 0);
     }
 }
