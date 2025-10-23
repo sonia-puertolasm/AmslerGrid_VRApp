@@ -10,8 +10,10 @@ public class ProbeDots : MonoBehaviour
 
     private MainGrid mainGrid;
     private IAGFocusSystem focusSystem;
+    private ProbeDotConstraints probeDotConstraints;
 
     private List<GameObject> probes = new List<GameObject>();
+    private Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>();
     private int selectedProbeIndex = -1;
 
     void Start()
@@ -21,16 +23,21 @@ public class ProbeDots : MonoBehaviour
             mainGrid = FindObjectOfType<MainGrid>();
             if (mainGrid == null)
             {
-                Debug.LogError("ProbeManager: No existing grid, cannot generate probe dots");
                 return;
             }
         }
 
         if (focusSystem == null)
         {
-            Debug.LogError("ProbeDots: IAGFocusSystem is not found in scene. Creating...");
             GameObject focusManagerObj = new GameObject("FocusManager");
             focusSystem = focusManagerObj.AddComponent<IAGFocusSystem>();
+        }
+
+        probeDotConstraints = FindObjectOfType<ProbeDotConstraints>();
+        if (probeDotConstraints == null)
+        {
+            GameObject constraintsObj = new GameObject("ProbeDotConstraints");
+            probeDotConstraints = constraintsObj.AddComponent<ProbeDotConstraints>();
         }
 
         CreateProbes();
@@ -44,8 +51,6 @@ public class ProbeDots : MonoBehaviour
         {
             focusSystem.SetGridParent(mainGrid.transform);
             focusSystem.SetProbeParent(this.transform);
-
-            Debug.Log("Focus system references set up successfully");
         }
     }
 
@@ -77,7 +82,10 @@ public class ProbeDots : MonoBehaviour
                 probe.name = "Probe" + probes.Count;
                 probe.transform.SetParent(transform);
                 probe.transform.localScale = Vector3.one * probeDotSize;
-                probe.transform.position = new Vector3(worldX, worldY, gridCenter.z - 0.15f);
+                Vector3 initialPosition = new Vector3(worldX, worldY, gridCenter.z - 0.15f);
+                probe.transform.position = initialPosition;
+
+                probeInitialPositions[probe] = initialPosition;
 
                 probe.GetComponent<Renderer>().material.color = ProbeColors.Default;
 
@@ -114,23 +122,25 @@ public class ProbeDots : MonoBehaviour
             GameObject selectedProbe = probes[selectedProbeIndex];
             float speed = moveSpeed * Time.deltaTime;
             Vector3 previousPosition = selectedProbe.transform.position;
+            Vector3 proposedPosition = selectedProbe.transform.position;
 
             if (Input.GetKey(KeyCode.UpArrow))
-                selectedProbe.transform.position += Vector3.up * speed;
+                proposedPosition += Vector3.up * speed;
             if (Input.GetKey(KeyCode.DownArrow))
-                selectedProbe.transform.position += Vector3.down * speed;
+                proposedPosition += Vector3.down * speed;
             if (Input.GetKey(KeyCode.RightArrow))
-                selectedProbe.transform.position += Vector3.right * speed;
+                proposedPosition += Vector3.right * speed;
             if (Input.GetKey(KeyCode.LeftArrow))
-                selectedProbe.transform.position += Vector3.left * speed;
+                proposedPosition += Vector3.left * speed;
 
-            if (focusSystem != null && focusSystem.IsFocused())
+            if (focusSystem != null && focusSystem.IsFocused() && probeDotConstraints != null)
             {
-                if (Vector3.Distance(previousPosition, selectedProbe.transform.position) > 0.001f)
-                {
-                    focusSystem.UpdateFocusPosition(selectedProbe.transform.position);
-                }
+                Vector3 focusMinBounds, focusMaxBounds;
+                focusSystem.GetFocusedRegionWorldBounds(out focusMinBounds, out focusMaxBounds);
+                proposedPosition = probeDotConstraints.ApplyFocusAreaConstraints(proposedPosition, focusMinBounds, focusMaxBounds);
             }
+
+            selectedProbe.transform.position = proposedPosition;
         }
     }
 
@@ -159,7 +169,9 @@ public class ProbeDots : MonoBehaviour
 
         if (focusSystem != null)
         {
-            focusSystem.EnterFocusMode(probes[selectedProbeIndex]);
+            GameObject selectedProbe = probes[selectedProbeIndex];
+            Vector3? initialPos = probeInitialPositions.ContainsKey(selectedProbe) ? probeInitialPositions[selectedProbe] : (Vector3?)null;
+            focusSystem.EnterFocusMode(selectedProbe, initialPos);
         }
     }
 

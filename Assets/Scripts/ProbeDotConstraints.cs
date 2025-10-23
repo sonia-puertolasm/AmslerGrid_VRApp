@@ -41,15 +41,22 @@ public class ProbeDotConstraints : MonoBehaviour
     public Vector3 ApplyConstraints(Vector3 proposedPosition, List<Vector3> neighborPositions, float maxNeighborDistance, int currentIteration)
     {
         Vector3 constrainedPos = proposedPosition;
-        
+
         constrainedPos = ConstrainToBoundary(constrainedPos);
-        
+
         if (neighborPositions != null && neighborPositions.Count > 0)
         {
             constrainedPos = ConstrainToNeighbors(constrainedPos, neighborPositions, maxNeighborDistance, currentIteration);
         }
-        
+
         return constrainedPos;
+    }
+
+    public Vector3 ApplyFocusAreaConstraints(Vector3 proposedPosition, Vector3 focusMinBounds, Vector3 focusMaxBounds)
+    {
+        float x = Mathf.Clamp(proposedPosition.x, focusMinBounds.x + boundaryPadding, focusMaxBounds.x - boundaryPadding);
+        float y = Mathf.Clamp(proposedPosition.y, focusMinBounds.y + boundaryPadding, focusMaxBounds.y - boundaryPadding);
+        return new Vector3(x, y, proposedPosition.z);
     }
     
 

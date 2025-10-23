@@ -27,7 +27,6 @@ public class MainGrid : MonoBehaviour
         DrawGrid();
         DrawCenterDot();
         SetupCamera();
-
     }
 
     private void SetupCamera()
@@ -35,7 +34,6 @@ public class MainGrid : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null)
         {
-            Debug.LogError("No Main Camera found!");
             return;
         }
 
@@ -55,7 +53,12 @@ public class MainGrid : MonoBehaviour
 
     void DrawGrid()
     {
-        // Create parent GameObject for all lines
+        Transform existingGridLines = transform.Find("GridLines");
+        if (existingGridLines != null)
+        {
+            Destroy(existingGridLines.gameObject);
+        }
+
         GameObject gridLinesParent = new GameObject("GridLines");
         gridLinesParent.transform.SetParent(transform);
         gridLinesParent.transform.localPosition = Vector3.zero;
@@ -63,7 +66,6 @@ public class MainGrid : MonoBehaviour
         float cellSize = totalGridWidth / gridSize;
         float halfWidth = totalGridWidth / 2f;
 
-        // Calculate bottom-left origin (keeping grid centered at gridCenterPosition)
         Vector3 origin = new Vector3(
             gridCenterPosition.x - halfWidth,
             gridCenterPosition.y - halfWidth,
@@ -73,30 +75,24 @@ public class MainGrid : MonoBehaviour
         int rows = gridSize;
         int cols = gridSize;
 
-        // Nested loops: i = row, k = col
         for (int i = 0; i < rows; i++)
         {
             for (int k = 0; k < cols; k++)
             {
-                // Calculate corner positions for cell (i, k)
                 Vector3 BL = origin + new Vector3(k * cellSize, i * cellSize, 0);
                 Vector3 BR = origin + new Vector3((k + 1) * cellSize, i * cellSize, 0);
                 Vector3 TL = origin + new Vector3(k * cellSize, (i + 1) * cellSize, 0);
                 Vector3 TR = origin + new Vector3((k + 1) * cellSize, (i + 1) * cellSize, 0);
 
-                // Always create TOP edge (TL -> TR)
                 CreateLine($"Line_r{i}_c{k}_TOP", TL, TR, gridLinesParent.transform);
 
-                // Always create RIGHT edge (BR -> TR)
                 CreateLine($"Line_r{i}_c{k}_RIGHT", BR, TR, gridLinesParent.transform);
 
-                // If bottom row (i == 0), create BOTTOM edge (BL -> BR)
                 if (i == 0)
                 {
                     CreateLine($"Line_r{i}_c{k}_BOTTOM", BL, BR, gridLinesParent.transform);
                 }
 
-                // If leftmost column (k == 0), create LEFT edge (BL -> TL)
                 if (k == 0)
                 {
                     CreateLine($"Line_r{i}_c{k}_LEFT", BL, TL, gridLinesParent.transform);
@@ -129,6 +125,12 @@ public class MainGrid : MonoBehaviour
     }
     private void DrawCenterDot()
     {
+        Transform existingCenterDot = transform.Find("CenterDot");
+        if (existingCenterDot != null)
+        {
+            Destroy(existingCenterDot.gameObject);
+        }
+
         centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         centerDot.name = "CenterDot";
         centerDot.transform.SetParent(transform);

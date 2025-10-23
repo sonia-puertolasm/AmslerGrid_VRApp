@@ -11,15 +11,18 @@ public class IAGIteration : MonoBehaviour
     private DisplacementTracker displacementTracker;
 
     private int currentIteration = 1;
+    private const int MAX_ITERATION = 3; // Maximum allowed iteration
     private const int iteration1_probecount = 8;
     private const int iterationhigher_probecount = 8;
 
     private float probeDotSize = 0.2f;
     private float moveSpeed = 4f;
+    private float currentProbeSpacing = 0f; // Spacing between probes for current iteration
 
     private List<GameObject> iteration1Probes = new List<GameObject>();
     private List<GameObject> iterationcurrentProbes = new List<GameObject>();
     private Dictionary<int, List<GameObject>> iterationProbes = new Dictionary<int, List<GameObject>>();
+    private Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>();
 
     private class ProbeState
     {
@@ -118,6 +121,10 @@ public class IAGIteration : MonoBehaviour
 
         CreateIteration1Probes();
         iterationcurrentProbes = iteration1Probes;
+
+        float cellSize = mainGrid.CellSize;
+        int spacing = mainGrid.GridSize / 3;
+        currentProbeSpacing = spacing * cellSize;
     }
 
     private void CreateIteration1Probes()
@@ -157,6 +164,11 @@ public class IAGIteration : MonoBehaviour
 
     private void StartHigherIteration(GameObject centerProbe)
     {
+        if (currentIteration >= MAX_ITERATION)
+        {
+            return;
+        }
+
         if (currentCenterProbe != null)
         {
             currentCenterProbe.SetActive(false);
@@ -235,6 +247,8 @@ public class IAGIteration : MonoBehaviour
         float regionSize = mainGrid.TotalGridWidth / Mathf.Pow(3f, currentIteration - 1);
         float step = regionSize / 3f;
 
+        currentProbeSpacing = step;
+
         for (int y = 0; y < 3; y++)
         {
             for (int x = 0; x < 3; x++)
@@ -262,7 +276,10 @@ public class IAGIteration : MonoBehaviour
         probe.name = $"Probe_Iter{currentIteration}_#{index}";
         probe.transform.SetParent(transform);
         probe.transform.localScale = Vector3.one * probeDotSize;
-        probe.transform.position = new Vector3(x, y, z);
+        Vector3 initialPosition = new Vector3(x, y, z);
+        probe.transform.position = initialPosition;
+
+        probeInitialPositions[probe] = initialPosition;
 
         Color initialColor = currentIteration > 1 ? ProbeColors.InactiveHigherIt : ProbeColors.Default;
         probe.GetComponent<Renderer>().material.color = initialColor;
@@ -328,7 +345,9 @@ public class IAGIteration : MonoBehaviour
 
         if (focusSystem != null)
         {
-            focusSystem.EnterFocusMode(iterationcurrentProbes[selectedProbeIndex]);
+            GameObject selectedProbe = iterationcurrentProbes[selectedProbeIndex];
+            Vector3? initialPos = probeInitialPositions.ContainsKey(selectedProbe) ? probeInitialPositions[selectedProbe] : (Vector3?)null;
+            focusSystem.EnterFocusMode(selectedProbe, initialPos, currentProbeSpacing);
         }
     }
 
@@ -355,22 +374,28 @@ public class IAGIteration : MonoBehaviour
                 List<Vector3> neighbors = GetNeighborPositions(selectedProbeIndex);
                 float maxDistance = constraintManager.GetMaxNeighborDistance(currentIteration);
                 Vector3 constrainedPosition = constraintManager.ApplyConstraints(proposedPosition, neighbors, maxDistance, currentIteration);
-                
-                selectedProbe.transform.position = Vector3.Lerp(previousPosition, constrainedPosition, 0.1f);
 
                 if (focusSystem != null && focusSystem.IsFocused())
                 {
-                    focusSystem.UpdateFocusPosition(constrainedPosition);
+                    Vector3 focusMinBounds, focusMaxBounds;
+                    focusSystem.GetFocusedRegionWorldBounds(out focusMinBounds, out focusMaxBounds);
+                    constrainedPosition = constraintManager.ApplyFocusAreaConstraints(constrainedPosition, focusMinBounds, focusMaxBounds);
                 }
+
+                selectedProbe.transform.position = Vector3.Lerp(previousPosition, constrainedPosition, 0.1f);
             }
             else if (Vector3.Distance(previousPosition, proposedPosition) > 0.001f)
             {
-                selectedProbe.transform.position = proposedPosition;
-                
-                if (focusSystem != null && focusSystem.IsFocused())
+                Vector3 finalPosition = proposedPosition;
+
+                if (focusSystem != null && focusSystem.IsFocused() && constraintManager != null)
                 {
-                    focusSystem.UpdateFocusPosition(proposedPosition);
+                    Vector3 focusMinBounds, focusMaxBounds;
+                    focusSystem.GetFocusedRegionWorldBounds(out focusMinBounds, out focusMaxBounds);
+                    finalPosition = constraintManager.ApplyFocusAreaConstraints(finalPosition, focusMinBounds, focusMaxBounds);
                 }
+
+                selectedProbe.transform.position = finalPosition;
             }
 
             if (Input.GetKeyDown(KeyCode.Space))
@@ -560,9 +585,9 @@ public class IAGIteration : MonoBehaviour
             if (currentCenterProbe != null)
             {
                 currentCenterProbe.SetActive(true);
-                currentCenterProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt; 
+                currentCenterProbe.GetComponent<Renderer>().material.color = ProbeColors.CenterHigherIt;
             }
-    }
+        }
     }
 
     private void HandleRegionSelection()
