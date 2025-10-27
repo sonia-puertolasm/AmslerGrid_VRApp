@@ -66,7 +66,9 @@
     <Compile Include="Assets\Scripts\ProbeDots.cs" />
     <Compile Include="Assets\Scripts\IAGFocusSystem.cs" />
     <Compile Include="Assets\Scripts\ProbeColors.cs" />
+    <Compile Include="Assets\Scripts\GridSpawn_New.cs" />
     <Compile Include="Assets\Scripts\DisplacementTracker.cs" />
+    <Compile Include="Assets\Scripts\ProbePointManager.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>
