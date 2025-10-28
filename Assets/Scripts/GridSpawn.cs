@@ -2,33 +2,49 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Manages the main grid generation and configuration
 public class MainGrid : MonoBehaviour
 {
+
+    // Definition of grid configuration parameters
     private int gridSize = 8;
     private float totalGridWidth = 10f;
-    private float lineWidth = 0.15f;  
+    private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
 
+    // Definition of center fixation point parameters
     private float centerDotSize = 0.3f;
     private Color centerDotColor = Color.red;
 
     public Vector3 gridCenterPosition = Vector3.zero;
 
+    // Definition of storage for grid lines and points
     private List<GameObject> allLines = new List<GameObject>();
     private GameObject centerDot;
 
+    // Store all grid intersection points
+    private GameObject[,] gridPoints;
+    private float pointSize = 0.1f;
+
+    // Public accessors for properties of the grid
     public int GridSize => gridSize;
     public float TotalGridWidth => totalGridWidth;
     public float CellSize => totalGridWidth / gridSize;
     public Vector3 GridCenterPosition => gridCenterPosition;
 
+    // Public accessor for grid points
+    public GameObject[,] GridPoints => gridPoints;
+
+    // Initialization of all grid-generation functions
     void Start()
     {
+        CreateGridPoints();
         DrawGrid();
-        DrawCenterDot();
+        SetupCenterFixationPoint();
         SetupCamera();
     }
 
+    // FUNCTION: Camera setup to ensure full grid visibility
     private void SetupCamera()
     {
         Camera cam = Camera.main;
@@ -51,49 +67,96 @@ public class MainGrid : MonoBehaviour
         cam.cullingMask = -1;
     }
 
-    void DrawGrid()
+    // FUNCTION: Creation of grid intersection points as invisible spheres
+    private void CreateGridPoints()
     {
-        Transform existingGridLines = transform.Find("GridLines");
-        if (existingGridLines != null)
-        {
-            Destroy(existingGridLines.gameObject);
-        }
+        int pointsPerDimension = gridSize + 1; // Example: for gridSize 8, we need 9 points per dimension
+        gridPoints = new GameObject[pointsPerDimension, pointsPerDimension]; // Generation of GameObject for each grid point to include inside the 'Main Grid ' and 'Grid Points' parents
 
-        GameObject gridLinesParent = new GameObject("GridLines");
-        gridLinesParent.transform.SetParent(transform);
-        gridLinesParent.transform.localPosition = Vector3.zero;
-
-        float cellSize = totalGridWidth / gridSize;
-        float halfWidth = totalGridWidth / 2f;
+        float cellSize = totalGridWidth / gridSize; // Calculation of the size of each cell in the grid -> ALL cells have the same initial size
+        float halfWidth = totalGridWidth / 2f; // Calculation of half the total grid width to center the grid around the specified position
 
         Vector3 origin = new Vector3(
             gridCenterPosition.x - halfWidth,
             gridCenterPosition.y - halfWidth,
             gridCenterPosition.z
-        );
+        ); // Calculation of the origin point (bottom-left corner) of the grid
 
+        GameObject gridPointsParent = new GameObject("GridPoints"); // Definition of a parent GameObject to hold all grid points
+        gridPointsParent.transform.SetParent(transform); // Set the parent to the current GameObject
+        gridPointsParent.transform.localPosition = Vector3.zero; // Local position set to zero to align with the parent
+
+        for (int row = 0; row < pointsPerDimension; row++) // Loop through every row and column to create grid points
+        {
+            for (int col = 0; col < pointsPerDimension; col++)
+            {
+                Vector3 pointPosition = origin + new Vector3(col * cellSize, row * cellSize, 0); // Calculation of the position for each grid point
+
+                GameObject gridPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere); // Creation of a sphere primitive to represent the grid point
+                gridPoint.name = $"GridPoint_r{row}_c{col}"; // Assignment of a unique name to each grid point based on its row and column position
+                gridPoint.transform.SetParent(gridPointsParent.transform); // Set the parent to the grid points parent GameObject
+                gridPoint.transform.position = pointPosition; // Set the position of the grid point
+                gridPoint.transform.localScale = Vector3.one * pointSize; // Set the scale of the grid point
+
+                Renderer renderer = gridPoint.GetComponent<Renderer>(); // Get the Renderer component to modify its visibility
+                renderer.enabled = false; // Initially set the grid point to be invisible
+
+                gridPoints[row, col] = gridPoint; // Store the grid point in the 2D array for being able to afterwards access it
+
+                // Add a custom component to store grid coordinates
+                GridPointData pointData = gridPoint.AddComponent<GridPointData>(); // Add a custom component to store grid coordinates
+                pointData.row = row; // Row coordinate
+                pointData.col = col; // Column coordinate
+                pointData.isInteractable = true; // Initially set as interactable
+            }
+        }
+    }
+
+    // FUNCTION: Drawing of grid lines using LineRenderer components
+    void DrawGrid()
+    {
+        Transform existingGridLines = transform.Find("GridLines"); // Check for existing grid lines and remove them if they exist
+        if (existingGridLines != null) // If existing grid lines are found, destroy them to avoid duplication
+        {
+            Destroy(existingGridLines.gameObject);
+        }
+
+        GameObject gridLinesParent = new GameObject("GridLines"); // Creation of a parent GameObject to hold all grid lines
+        gridLinesParent.transform.SetParent(transform); // Set the parent to the current GameObject
+        gridLinesParent.transform.localPosition = Vector3.zero; // Local position set to zero to align with the parent
+
+        float cellSize = totalGridWidth / gridSize; // Calculation of the size of each cell in the grid
+        float halfWidth = totalGridWidth / 2f; // Calculation of half the total grid width to center the grid around the specified position
+
+        Vector3 origin = new Vector3(
+            gridCenterPosition.x - halfWidth,
+            gridCenterPosition.y - halfWidth,
+            gridCenterPosition.z
+        ); // Calculation of the origin point (bottom-left corner) of the grid
+
+        // Number of rows and columns based on grid size
         int rows = gridSize;
         int cols = gridSize;
 
+        // Loop through each cell (row, column) to create the grid lines
         for (int i = 0; i < rows; i++)
         {
             for (int k = 0; k < cols; k++)
             {
-                Vector3 BL = origin + new Vector3(k * cellSize, i * cellSize, 0);
-                Vector3 BR = origin + new Vector3((k + 1) * cellSize, i * cellSize, 0);
-                Vector3 TL = origin + new Vector3(k * cellSize, (i + 1) * cellSize, 0);
-                Vector3 TR = origin + new Vector3((k + 1) * cellSize, (i + 1) * cellSize, 0);
+                Vector3 BL = origin + new Vector3(k * cellSize, i * cellSize, 0); // Bottom-Left corner of the cell
+                Vector3 BR = origin + new Vector3((k + 1) * cellSize, i * cellSize, 0); // Bottom-Right corner of the cell
+                Vector3 TL = origin + new Vector3(k * cellSize, (i + 1) * cellSize, 0); // Top-Left corner of the cell
+                Vector3 TR = origin + new Vector3((k + 1) * cellSize, (i + 1) * cellSize, 0); // Top-Right corner of the cell
 
-                CreateLine($"Line_r{i}_c{k}_TOP", TL, TR, gridLinesParent.transform);
+                CreateLine($"Line_r{i}_c{k}_TOP", TL, TR, gridLinesParent.transform); // Top line of the cell
+                CreateLine($"Line_r{i}_c{k}_RIGHT", BR, TR, gridLinesParent.transform); // Right line of the cell
 
-                CreateLine($"Line_r{i}_c{k}_RIGHT", BR, TR, gridLinesParent.transform);
-
-                if (i == 0)
+                if (i == 0) // Draw bottom line only for the first row to avoid duplication
                 {
                     CreateLine($"Line_r{i}_c{k}_BOTTOM", BL, BR, gridLinesParent.transform);
                 }
 
-                if (k == 0)
+                if (k == 0) // Draw left line only for the first column to avoid duplication
                 {
                     CreateLine($"Line_r{i}_c{k}_LEFT", BL, TL, gridLinesParent.transform);
                 }
@@ -101,42 +164,77 @@ public class MainGrid : MonoBehaviour
         }
     }
 
+    // FUNCTION: Helper method to create a line between two points using LineRenderer -> used in DrawGrid() FUNCTION
     private void CreateLine(string name, Vector3 start, Vector3 end, Transform parent)
     {
-        GameObject line = new GameObject(name);
-        line.transform.SetParent(parent);
-        LineRenderer lr = line.AddComponent<LineRenderer>();
+        GameObject lineObj = new GameObject(name); // Creation of a new GameObject to hold the LineRenderer
+        lineObj.transform.SetParent(parent); // Set the parent to the specified parent GameObject
+        LineRenderer lineRenderer = lineObj.AddComponent<LineRenderer>(); // Add a LineRenderer component to the GameObject
 
-        lr.material = new Material(Shader.Find("Unlit/Color"));
-        lr.material.color = lineColor;
-        lr.startColor = lineColor;
-        lr.endColor = lineColor;
-        lr.startWidth = lineWidth;
-        lr.endWidth = lineWidth;
-        lr.useWorldSpace = true;
-        lr.numCapVertices = 5;
-        lr.numCornerVertices = 5;
-        lr.positionCount = 2;
+        // Definition of properties for the LineRenderer to work as desired
+        lineRenderer.material = new Material(Shader.Find("Unlit/Color"));
+        lineRenderer.material.color = lineColor;
+        lineRenderer.startColor = lineColor;
+        lineRenderer.endColor = lineColor;
+        lineRenderer.startWidth = lineWidth;
+        lineRenderer.endWidth = lineWidth;
+        lineRenderer.useWorldSpace = true; // Use world space coordinates
+        lineRenderer.numCapVertices = 5; // Rounded line caps
+        lineRenderer.numCornerVertices = 5; // Rounded line corners
+        lineRenderer.positionCount = 2; // Two points for the line
 
-        lr.SetPosition(0, start);
-        lr.SetPosition(1, end);
+        // Set the start and end positions of the line
+        lineRenderer.SetPosition(0, start);
+        lineRenderer.SetPosition(1, end);
 
-        allLines.Add(line);
+        // Store the line GameObject in the list for future reference
+        allLines.Add(lineObj);
     }
-    private void DrawCenterDot()
+
+    // FUNCTION: Setup of the center fixation point in the middle of the grid
+    private void SetupCenterFixationPoint()
     {
-        Transform existingCenterDot = transform.Find("CenterDot");
-        if (existingCenterDot != null)
-        {
-            Destroy(existingCenterDot.gameObject);
-        }
+        int centerIndex = gridSize / 2; // Calculation of the center index based on grid size
 
-        centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        centerDot.name = "CenterDot";
-        centerDot.transform.SetParent(transform);
-        centerDot.transform.localScale = Vector3.one * centerDotSize;
-        centerDot.transform.position = gridCenterPosition + new Vector3(0, 0, -0.2f);
+        GameObject centerGridPoint = gridPoints[centerIndex, centerIndex]; // Access the center grid point from the grid points array
 
-        centerDot.GetComponent<Renderer>().material.color = centerDotColor;
+        Renderer renderer = centerGridPoint.GetComponent<Renderer>(); // Get the Renderer component to modify its appearance
+        renderer.enabled = true; // Make the center point visible
+        renderer.material.color = centerDotColor; // Set the color of the center point
+        centerGridPoint.transform.localScale = Vector3.one * centerDotSize; // Set the size of the center point
+        centerGridPoint.transform.position += new Vector3(0, 0, -0.2f); // Slightly offset in Z to ensure visibility over grid lines
+
+        GridPointData pointData = centerGridPoint.GetComponent<GridPointData>(); // Access the custom GridPointData component
+        pointData.isInteractable = false; // Set as non-interactable
+        pointData.isCenterFixation = true; // Mark as center fixation point
+
+        centerGridPoint.name = "CenterFixationPoint"; // Rename for posterior identification
+
+        centerDot = centerGridPoint; // Store reference to the center dot
+    }
+}
+
+// Custom component to store additional data for each grid point
+public class GridPointData : MonoBehaviour
+{
+    // Grid coordinates
+    public int row;
+    public int col;
+
+    // State flags
+    public bool isInteractable = true;
+    public bool isCenterFixation = false;
+
+    public bool isDeformed = false;
+
+    // Original and adjusted positions for deformation tracking
+    public Vector3 originalPosition;
+    public Vector3 adjustedPosition;
+
+    // Initialization of original and adjusted positions
+    void Awake()
+    {
+        originalPosition = transform.position;
+        adjustedPosition = transform.position;
     }
 }
