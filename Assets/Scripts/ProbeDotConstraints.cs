@@ -14,7 +14,7 @@ public class ProbeDotConstraints : MonoBehaviour
 
     // Define configuration parameters
     public float boundaryPadding = 0.1f; // Padding from grid edges
-    public float minNeighborDistance = 0.2f; // Minimum distance between neighbors (should match probe dot size)
+    private float cellSize; // Size of one grid cell - used to keep probes one cell away from neighbors
 
     // Define boundary limits variables
     private float minX, maxX, minY, maxY;
@@ -48,6 +48,8 @@ public class ProbeDotConstraints : MonoBehaviour
         minY = center.y - halfSize + boundaryPadding;
         maxY = center.y + halfSize - boundaryPadding;
 
+        // Calculate cell size - this will be used as minimum distance to keep probes one cell away from neighbors
+        cellSize = mainGrid.CellSize;
     }
 
     // FUNCTION: Application of constraints to a proposed probe position -> Neighbor and Boundary constraints
@@ -83,86 +85,89 @@ public class ProbeDotConstraints : MonoBehaviour
         return new Vector3(x, y, position.z); // Return constrained position
     }
 
-    // FUNCTION: Constrain position based on the neighboring probes
-    // Constrains movement within the area bounded by neighboring probe initial positions
+    // FUNCTION: Constrain position based on the neighboring probes and grid boundaries
+    // Constrains movement within a fixed rectangular region defined by neighbors relative to initial position
     private Vector3 ConstrainToNeighbors(Vector3 proposedPos, List<Vector3> neighbors, Vector3 currentPos, Vector3 initialPos)
     {
-        if (neighbors == null || neighbors.Count == 0) // If there is no neighbors, no constraints needed
-            return proposedPos;
-
         Vector3 constrainedPos = proposedPos; // Start with the proposed position
 
-        // Determine movement direction (axis-locked movement)
-        float movementDeltaX = Mathf.Abs(proposedPos.x - currentPos.x);
-        float movementDeltaY = Mathf.Abs(proposedPos.y - currentPos.y);
-        bool isMovingHorizontally = movementDeltaX > movementDeltaY;
+        // Define a fixed rectangular region based on the nearest neighbor in each cardinal direction
+        // from the probe's INITIAL position. This creates a "cell" the probe cannot leave.
 
-        // Threshold for considering positions on the same grid line
-        float gridLineThreshold = 0.2f;
+        // Initialize bounds to grid boundaries (used if no neighbor exists in a direction)
+        float leftBound = minX;    // Nearest obstacle to the left
+        float rightBound = maxX;   // Nearest obstacle to the right
+        float downBound = minY;    // Nearest obstacle below
+        float upBound = maxY;      // Nearest obstacle above
 
-        // Find the closest neighbor in each cardinal direction from the INITIAL position
-        // These neighbors define the fixed movement boundaries
-        float? leftBound = null;   // Max X (cannot go further left than this)
-        float? rightBound = null;  // Min X (cannot go further right than this)
-        float? downBound = null;   // Max Y (cannot go further down than this)
-        float? upBound = null;     // Min Y (cannot go further up than this)
+        // Track whether each bound is set by a neighbor (true) or grid edge (false)
+        bool leftIsNeighbor = false;
+        bool rightIsNeighbor = false;
+        bool downIsNeighbor = false;
+        bool upIsNeighbor = false;
 
-        foreach (Vector3 neighbor in neighbors) // Iterate through each neighbor to determine directional bounds
+        // Find the nearest neighbor in each cardinal direction from the INITIAL position
+        if (neighbors != null && neighbors.Count > 0)
         {
-            if (isMovingHorizontally)
+            foreach (Vector3 neighbor in neighbors)
             {
-                // For horizontal movement, only consider neighbors on the same horizontal grid line (same Y as initial position)
-                if (Mathf.Abs(neighbor.y - initialPos.y) <= gridLineThreshold)
+                // Check if neighbor is to the LEFT of initial position (regardless of Y)
+                if (neighbor.x < initialPos.x)
                 {
-                    // Check if neighbor is to the LEFT of initial position
-                    if (neighbor.x < initialPos.x)
+                    // Find the CLOSEST neighbor to the left (maximum X among left neighbors)
+                    if (neighbor.x > leftBound)
                     {
-                        if (!leftBound.HasValue || neighbor.x > leftBound.Value)
-                            leftBound = neighbor.x;
-                    }
-                    // Check if neighbor is to the RIGHT of initial position
-                    else if (neighbor.x > initialPos.x)
-                    {
-                        if (!rightBound.HasValue || neighbor.x < rightBound.Value)
-                            rightBound = neighbor.x;
+                        leftBound = neighbor.x;
+                        leftIsNeighbor = true;
                     }
                 }
-            }
-            else
-            {
-                // For vertical movement, only consider neighbors on the same vertical grid line (same X as initial position)
-                if (Mathf.Abs(neighbor.x - initialPos.x) <= gridLineThreshold)
+
+                // Check if neighbor is to the RIGHT of initial position (regardless of Y)
+                if (neighbor.x > initialPos.x)
                 {
-                    // Check if neighbor is BELOW initial position
-                    if (neighbor.y < initialPos.y)
+                    // Find the CLOSEST neighbor to the right (minimum X among right neighbors)
+                    if (neighbor.x < rightBound)
                     {
-                        if (!downBound.HasValue || neighbor.y > downBound.Value)
-                            downBound = neighbor.y;
+                        rightBound = neighbor.x;
+                        rightIsNeighbor = true;
                     }
-                    // Check if neighbor is ABOVE initial position
-                    else if (neighbor.y > initialPos.y)
+                }
+
+                // Check if neighbor is BELOW initial position (regardless of X)
+                if (neighbor.y < initialPos.y)
+                {
+                    // Find the CLOSEST neighbor below (maximum Y among neighbors below)
+                    if (neighbor.y > downBound)
                     {
-                        if (!upBound.HasValue || neighbor.y < upBound.Value)
-                            upBound = neighbor.y;
+                        downBound = neighbor.y;
+                        downIsNeighbor = true;
+                    }
+                }
+
+                // Check if neighbor is ABOVE initial position (regardless of X)
+                if (neighbor.y > initialPos.y)
+                {
+                    // Find the CLOSEST neighbor above (minimum Y among neighbors above)
+                    if (neighbor.y < upBound)
+                    {
+                        upBound = neighbor.y;
+                        upIsNeighbor = true;
                     }
                 }
             }
         }
 
-        // Apply directional constraints with minimum distance
-        // If a bound exists, constrain movement between neighbors
-        // If no bound exists, allow movement to grid edges (handled by ConstrainToBoundary)
-        if (leftBound.HasValue)
-            constrainedPos.x = Mathf.Max(constrainedPos.x, leftBound.Value + minNeighborDistance);
+        // Small buffer to stop "right before" a neighbor (approximately half a grid cell)
+        float neighborBuffer = cellSize * 0.5f;
 
-        if (rightBound.HasValue)
-            constrainedPos.x = Mathf.Min(constrainedPos.x, rightBound.Value - minNeighborDistance);
+        // Apply constraints with appropriate padding based on whether it's a neighbor or grid edge
+        float minXConstraint = leftBound + (leftIsNeighbor ? neighborBuffer : 0);
+        float maxXConstraint = rightBound - (rightIsNeighbor ? neighborBuffer : 0);
+        float minYConstraint = downBound + (downIsNeighbor ? neighborBuffer : 0);
+        float maxYConstraint = upBound - (upIsNeighbor ? neighborBuffer : 0);
 
-        if (downBound.HasValue)
-            constrainedPos.y = Mathf.Max(constrainedPos.y, downBound.Value + minNeighborDistance);
-
-        if (upBound.HasValue)
-            constrainedPos.y = Mathf.Min(constrainedPos.y, upBound.Value - minNeighborDistance);
+        constrainedPos.x = Mathf.Clamp(constrainedPos.x, minXConstraint, maxXConstraint);
+        constrainedPos.y = Mathf.Clamp(constrainedPos.y, minYConstraint, maxYConstraint);
 
         return constrainedPos;
     }
@@ -181,13 +186,14 @@ public class ProbeDotConstraints : MonoBehaviour
             return true;
 
         Vector2 pos2D = new Vector2(position.x, position.y); // 2D representation of the position
+        float neighborBuffer = cellSize * 0.5f; // Same buffer as in ConstrainToNeighbors
 
         foreach (Vector3 neighbor in neighbors) // Check distance to each neighbor
         {
             Vector2 neighbor2D = new Vector2(neighbor.x, neighbor.y); // 2D representation of neighbor position
             float distance = Vector2.Distance(pos2D, neighbor2D); // Calculate distance
 
-            if (distance < minNeighborDistance)
+            if (distance < neighborBuffer)
                 return false; // Too close to a neighbor
         }
 

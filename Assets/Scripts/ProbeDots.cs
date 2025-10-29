@@ -8,15 +8,16 @@ public class ProbeDots : MonoBehaviour
     // Definition of references to main grid
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
+    private FocusSystem focusSystem;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     public float probeDotSize = 0.2f; // Size of each probe dot
     public float moveSpeed = 2f; // Speed of probe movement
     public float probeSpacing = 0f; // Spacing between probes
 
-    private List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
+    public List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
     private Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
-    private int selectedProbeIndex = -1; // Index of the currently selected probe
+    public int selectedProbeIndex = -1; // Index of the currently selected probe
 
     // Neighbor tracking for constraint application
     private Dictionary<int, List<int>> probeNeighbors = new Dictionary<int, List<int>>(); // Maps probe index to its neighbor indices
@@ -50,6 +51,9 @@ public class ProbeDots : MonoBehaviour
         {
             constraints = gameObject.AddComponent<ProbeDotConstraints>();
         }
+
+        // Initialize focus system reference
+        focusSystem = FindObjectOfType<FocusSystem>();
 
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
@@ -380,13 +384,19 @@ public class ProbeDots : MonoBehaviour
 
     private void HandleKeys()
     {
-        // Space key: Complete/mark current probe as done
+        // Space key: Complete/mark current probe as done and exit focus mode
         if (Input.GetKeyDown(KeyCode.Space))
         {
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
             {
                 probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
                 selectedProbeIndex = -1; // Deselect probe
+
+                // Exit focus mode
+                if (focusSystem != null)
+                {
+                    focusSystem.ExitFocusMode();
+                }
             }
         }
 
@@ -398,6 +408,12 @@ public class ProbeDots : MonoBehaviour
                 probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed;
             }
             selectedProbeIndex = -1;
+
+            // Exit focus mode
+            if (focusSystem != null)
+            {
+                focusSystem.ExitFocusMode();
+            }
         }
     }
 

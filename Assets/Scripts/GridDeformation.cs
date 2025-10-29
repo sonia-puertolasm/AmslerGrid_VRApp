@@ -5,32 +5,31 @@ using UnityEngine;
 // Manages dynamic deformation of grid lines based on probe dot movements
 public class GridDeformation : MonoBehaviour
 {
+    // Reference to the main grid and probe dots
     private MainGrid mainGrid;
     private ProbeDots probeDots;
 
     // Store references to all grid lines organized by type and index with original positions
-    private Dictionary<int, List<LineRendererInfo>> horizontalLines = new Dictionary<int, List<LineRendererInfo>>();
-    private Dictionary<int, List<LineRendererInfo>> verticalLines = new Dictionary<int, List<LineRendererInfo>>();
+    public Dictionary<int, List<LineRendererInfo>> horizontalLines = new Dictionary<int, List<LineRendererInfo>>();
+    public Dictionary<int, List<LineRendererInfo>> verticalLines = new Dictionary<int, List<LineRendererInfo>>();
 
-    // Track which probes affect which grid lines
+    // Maps each probe dot to its corresponding grid lines
     private Dictionary<GameObject, GridLineInfo> probeGridLineMap = new Dictionary<GameObject, GridLineInfo>();
 
     // Enable/disable deformation
-    public bool enableDeformation = true;
+    private bool enableDeformation = true;
 
     // Movement threshold - only deform if probe moved more than this distance
-    public float movementThreshold = 0.01f;
+    private float movementThreshold = 0.01f;
 
-    // Smoothing factor for line deformation (higher = smoother curves)
-    public int segmentsPerCell = 4; // Number of segments to divide each cell into for smooth deformation
-
+    // Initialization of Amsler Grid's deformation process
     void Start()
     {
-        // Find required components
+        // Find required components that have been previously defined
         mainGrid = FindObjectOfType<MainGrid>();
         probeDots = FindObjectOfType<ProbeDots>();
 
-        if (mainGrid == null || probeDots == null) // Disable deformation if the main grid or probe dots are missing
+        if (mainGrid == null || probeDots == null) // Avoid initiation of deformation if the main grid or probe dots are missing
         {
             enabled = false;
             return;
@@ -40,7 +39,7 @@ public class GridDeformation : MonoBehaviour
         StartCoroutine(InitializeDeformation());
     }
 
-    private IEnumerator InitializeDeformation()
+    private IEnumerator InitializeDeformation() // Coroutine to initialize deformation after grid is created -> allows method to pause and resume
     {
         // Wait until grid is fully created
         yield return new WaitForSeconds(0.1f);
@@ -76,7 +75,7 @@ public class GridDeformation : MonoBehaviour
         float halfWidth = mainGrid.TotalGridWidth / 2f;
         Vector3 gridCenter = mainGrid.GridCenterPosition;
 
-        // Calculate grid origin
+        // Calculate grid origin -> we use the bottom-left corner as the reference point for all calculations
         float originX = gridCenter.x - halfWidth;
         float originY = gridCenter.y - halfWidth;
 
@@ -96,7 +95,7 @@ public class GridDeformation : MonoBehaviour
                 continue; // If there is no LineRenderer, skip
             } 
 
-            // Get and store the original start and end positions
+            // Get and store the original start and end positions for each line renderer
             Vector3 start = lr.GetPosition(0);
             Vector3 end = lr.GetPosition(1);
 
@@ -112,16 +111,16 @@ public class GridDeformation : MonoBehaviour
             bool isHorizontal = Mathf.Abs(start.y - end.y) < 0.01f;
             bool isVertical = Mathf.Abs(start.x - end.x) < 0.01f;
 
-            if (isHorizontal)
+            if (isHorizontal) // Calculate which grid line (X-coordinates) is this
             {
                 // Calculate which horizontal line index this is
-                int lineIndex = Mathf.RoundToInt((start.y - originY) / cellSize);
-                if (lineIndex >= 0 && lineIndex <= gridSize)
+                int lineIndex = Mathf.RoundToInt((start.y - originY) / cellSize); // How many cells is this specific line away from the origin?
+                if (lineIndex >= 0 && lineIndex <= gridSize) // Add the information to the dictionary if the values are within valid ranges
                 {
                     horizontalLines[lineIndex].Add(lineInfo);
                 }
             }
-            else if (isVertical)
+            else if (isVertical) // Calculate which grid "column" (Y-coordinates) is this -> same approach as for X-axis
             {
                 // Calculate which vertical line index this is
                 int lineIndex = Mathf.RoundToInt((start.x - originX) / cellSize);
@@ -136,8 +135,8 @@ public class GridDeformation : MonoBehaviour
     // FUNCTION: Map each probe to its corresponding horizontal and vertical grid lines
     private void MapProbesToGridLines()
     {
-        GameObject[,] gridPoints = mainGrid.GridPoints;
-        if (gridPoints == null) return;
+        GameObject[,] gridPoints = mainGrid.GridPoints; // Creates a 2D array of all the grid points
+        if (gridPoints == null) return; // Avoids errors in case the grid points are not defined
 
         float cellSize = mainGrid.CellSize;
         float halfWidth = mainGrid.TotalGridWidth / 2f;
@@ -150,14 +149,14 @@ public class GridDeformation : MonoBehaviour
         Transform probeDotTransform = probeDots.transform;
         foreach (Transform probeTransform in probeDotTransform)
         {
-            GameObject probe = probeTransform.gameObject;
-            Vector3 probePos = probe.transform.position;
+            GameObject probe = probeTransform.gameObject; // We obtain the probe GameObject to use later
+            Vector3 probePos = probe.transform.position; // We determine the world-space position of this probe
 
             // Find which grid lines this probe sits on (based on its initial position)
             int verticalLineIndex = Mathf.RoundToInt((probePos.x - originX) / cellSize);
             int horizontalLineIndex = Mathf.RoundToInt((probePos.y - originY) / cellSize);
 
-            // Store the mapping
+            // Store the mapping of the probe point to its grid lines
             GridLineInfo info = new GridLineInfo
             {
                 verticalLineIndex = verticalLineIndex,
@@ -165,14 +164,14 @@ public class GridDeformation : MonoBehaviour
                 originalPosition = probePos
             };
 
-            probeGridLineMap[probe] = info;
+            probeGridLineMap[probe] = info; // Actual storage of the mapping in the dictionary
         }
     }
 
     // FUNCTION: Update grid line deformations based on current probe positions
     private void UpdateGridDeformation()
     {
-        // Track which grid lines are affected by probes and their deformation points
+        // Creation of fresh deformation dictionaries that will store the line indexes and the deformation points
         Dictionary<int, List<DeformationPoint>> horizontalDeformations = new Dictionary<int, List<DeformationPoint>>();
         Dictionary<int, List<DeformationPoint>> verticalDeformations = new Dictionary<int, List<DeformationPoint>>();
 
@@ -182,13 +181,12 @@ public class GridDeformation : MonoBehaviour
             GameObject probe = kvp.Key;
             GridLineInfo info = kvp.Value;
 
-            if (probe == null || !probe.activeInHierarchy) continue;
+            if (probe == null || !probe.activeInHierarchy) continue; // Skip if the probe is missing or inactive
 
             Vector3 currentPos = probe.transform.position;
-            Vector3 displacement = currentPos - info.originalPosition;
+            Vector3 displacement = currentPos - info.originalPosition; // Vector that points from where the probe started to where it is now
 
-            // Only add deformation if probe has moved beyond threshold
-            if (displacement.magnitude > movementThreshold)
+            if (displacement.magnitude > movementThreshold) // Avoids small movements that don't require deformation
             {
                 // Add deformation point for horizontal line
                 if (!horizontalDeformations.ContainsKey(info.horizontalLineIndex))
@@ -197,9 +195,9 @@ public class GridDeformation : MonoBehaviour
                 }
                 horizontalDeformations[info.horizontalLineIndex].Add(new DeformationPoint
                 {
-                    position = currentPos,
-                    xCoord = currentPos.x,
-                    displacement = displacement
+                    position = currentPos, // Full 3D position
+                    xCoord = currentPos.x, // X-axis position
+                    displacement = displacement // How far has it moved?
                 });
 
                 // Add deformation point for vertical line
@@ -217,16 +215,16 @@ public class GridDeformation : MonoBehaviour
         }
 
         // Update horizontal lines
-        foreach (var kvp in horizontalLines)
+        foreach (var kvp in horizontalLines) // Iteration over all organised horizontal lines
         {
-            int lineIndex = kvp.Key;
-            List<LineRendererInfo> lines = kvp.Value;
+            int lineIndex = kvp.Key; // Which horizontal line are we looking at?
+            List<LineRendererInfo> lines = kvp.Value; // List of lr segments that conform this line
 
-            if (horizontalDeformations.ContainsKey(lineIndex))
+            if (horizontalDeformations.ContainsKey(lineIndex)) // If the line has deformation points
             {
                 // This line is affected by probe(s)
-                List<DeformationPoint> deformPoints = horizontalDeformations[lineIndex];
-                UpdateHorizontalLine(lines, lineIndex, deformPoints);
+                List<DeformationPoint> deformPoints = horizontalDeformations[lineIndex]; // Get the list of deformation points
+                UpdateHorizontalLine(lines, lineIndex, deformPoints); // Update the line segments accordingly to "bend" the line
             }
             else
             {
@@ -261,6 +259,7 @@ public class GridDeformation : MonoBehaviour
         // Sort deformation points by x coordinate
         deformPoints.Sort((a, b) => a.xCoord.CompareTo(b.xCoord));
 
+        // Iterate through each line segment that makes up this horizontal line
         foreach (LineRendererInfo lineInfo in lineSegments)
         {
             LineRenderer lr = lineInfo.lineRenderer;
@@ -278,13 +277,13 @@ public class GridDeformation : MonoBehaviour
                 }
             }
 
-            if (relevantPoints.Count > 0)
+            if (relevantPoints.Count > 0) // If there are deformation points within this segment
             {
                 // Deform this line segment
                 lr.positionCount = relevantPoints.Count + 2;
                 lr.SetPosition(0, originalStart);
 
-                for (int i = 0; i < relevantPoints.Count; i++)
+                for (int i = 0; i < relevantPoints.Count; i++) // Loop through all relevant deformation points and set them as positions in the line renderer
                 {
                     lr.SetPosition(i + 1, relevantPoints[i].position);
                 }
@@ -350,7 +349,7 @@ public class GridDeformation : MonoBehaviour
     // FUNCTION: Reset line renderers to their original 2-point straight configuration
     private void ResetLineRenderers(List<LineRendererInfo> lineRenderers)
     {
-        foreach (LineRendererInfo lineInfo in lineRenderers)
+        foreach (LineRendererInfo lineInfo in lineRenderers) // Iteration through each segment
         {
             LineRenderer lr = lineInfo.lineRenderer;
             if (lr.positionCount != 2)
