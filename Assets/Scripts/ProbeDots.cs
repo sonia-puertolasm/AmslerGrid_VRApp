@@ -9,6 +9,7 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
+    private GridDeformation gridDeformation;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     public float probeDotSize = 0.2f; // Size of each probe dot
@@ -25,13 +26,6 @@ public class ProbeDots : MonoBehaviour
     // Variables for movement tracking
     private Vector3 movementStartPosition; // Position at the beginning of the movement
     private bool isMoving = false; // Tracking about movement of probe
-    private Vector3 lockedAxis; // Which axis is locked during movement
-
-    // Grid line tracking for movement constraints
-    private List<float> gridLinePositionsX = new List<float>(); // Valid X positions (vertical grid lines)
-    private List<float> gridLinePositionsY = new List<float>(); // Valid Y positions (horizontal grid lines)
-    private int currentGridLineX = -1; // Current vertical line index
-    private int currentGridLineY = -1; // Current horizontal line index
 
     // Initialization of all probe dot functionalities
     void Start()
@@ -55,6 +49,9 @@ public class ProbeDots : MonoBehaviour
         // Initialize focus system reference
         focusSystem = FindObjectOfType<FocusSystem>();
 
+        // Initialize grid deformation reference
+        gridDeformation = FindObjectOfType<GridDeformation>();
+
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
     }
@@ -69,7 +66,6 @@ public class ProbeDots : MonoBehaviour
 
         CreateProbes(); // Execute function for probe creation after grid points are ready
         IdentifyProbeNeighbors(); // Identify which probes are neighbors of each other
-        CalculateGridLinePositions(); // Calculate all valid grid line positions for movement
     }
 
     void Update() // Update is called once per frame
@@ -77,81 +73,6 @@ public class ProbeDots : MonoBehaviour
         HandleProbeSelection();
         HandleProbeMovement();
         HandleKeys();
-    }
-
-    // FUNCTION: Calculate all valid grid line positions based on the grid structure
-    private void CalculateGridLinePositions()
-    {
-        gridLinePositionsX.Clear();
-        gridLinePositionsY.Clear();
-
-        float cellSize = mainGrid.CellSize;
-        float halfWidth = mainGrid.TotalGridWidth / 2f;
-        Vector3 gridCenter = mainGrid.GridCenterPosition;
-
-        // Calculate origin (bottom-left corner of grid)
-        float originX = gridCenter.x - halfWidth;
-        float originY = gridCenter.y - halfWidth;
-
-        int pointsPerDimension = mainGrid.GridSize + 1; // For 8x8 grid, there are 9 lines in each direction
-
-        // Calculate all horizontal and vertical grid line positions
-        for (int i = 0; i < pointsPerDimension; i++)
-        {
-            gridLinePositionsX.Add(originX + i * cellSize); // Vertical lines (X positions)
-            gridLinePositionsY.Add(originY + i * cellSize); // Horizontal lines (Y positions)
-        }
-    }
-
-    // FUNCTION: Find the nearest grid line index for a given position
-    private int FindNearestGridLineIndex(float position, List<float> gridLines)
-    {
-        if (gridLines == null || gridLines.Count == 0)
-            return -1;
-
-        int nearestIndex = 0;
-        float minDistance = Mathf.Abs(position - gridLines[0]);
-
-        for (int i = 1; i < gridLines.Count; i++)
-        {
-            float distance = Mathf.Abs(position - gridLines[i]);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                nearestIndex = i;
-            }
-        }
-
-        return nearestIndex;
-    }
-
-    // FUNCTION: Snap a position to the nearest grid line
-    private Vector3 SnapToGridLine(Vector3 position, bool isHorizontalMovement)
-    {
-        Vector3 snappedPosition = position;
-
-        if (isHorizontalMovement)
-        {
-            // Moving horizontally (left/right), so snap Y to nearest horizontal grid line
-            int nearestLineY = FindNearestGridLineIndex(position.y, gridLinePositionsY);
-            if (nearestLineY >= 0 && nearestLineY < gridLinePositionsY.Count)
-            {
-                snappedPosition.y = gridLinePositionsY[nearestLineY];
-                currentGridLineY = nearestLineY;
-            }
-        }
-        else
-        {
-            // Moving vertically (up/down), so snap X to nearest vertical grid line
-            int nearestLineX = FindNearestGridLineIndex(position.x, gridLinePositionsX);
-            if (nearestLineX >= 0 && nearestLineX < gridLinePositionsX.Count)
-            {
-                snappedPosition.x = gridLinePositionsX[nearestLineX];
-                currentGridLineX = nearestLineX;
-            }
-        }
-
-        return snappedPosition;
     }
 
     // FUNCTION: Creation of probes
@@ -295,45 +216,22 @@ public class ProbeDots : MonoBehaviour
             {
                 isMoving = true;
                 movementStartPosition = currentPosition;
-                lockedAxis = Vector3.zero;
 
-                // Determine which axis to lock based on first input
-                bool isHorizontalMovement = Mathf.Abs(inputDirection.x) > Mathf.Abs(inputDirection.y);
-
-                if (isHorizontalMovement)
+                // Enter displacement mode (switch to 4-line display)
+                if (gridDeformation != null)
                 {
-                    lockedAxis = new Vector3(1, 0, 1); // Allow X movement only
-                    // Snap to nearest horizontal grid line when starting horizontal movement
-                    movementStartPosition = SnapToGridLine(currentPosition, true);
+                    gridDeformation.EnterDisplacementMode(selectedProbe);
                 }
-                else
-                {
-                    lockedAxis = new Vector3(0, 1, 1); // Allow Y movement only
-                    // Snap to nearest vertical grid line when starting vertical movement
-                    movementStartPosition = SnapToGridLine(currentPosition, false);
-                }
-
-                // Update position to snapped position
-                selectedProbe.transform.position = movementStartPosition;
-                currentPosition = movementStartPosition;
             }
 
-            // Apply movement only on the locked axis
+            // Normalize input direction to prevent faster diagonal movement
+            if (inputDirection.magnitude > 1f)
+            {
+                inputDirection.Normalize();
+            }
+
+            // Apply free 2D movement
             proposedPosition += inputDirection * speed;
-
-            // Constrain to the locked axis and snap to grid line
-            if (lockedAxis.x == 0) // Y-axis movement only (vertical)
-            {
-                proposedPosition.x = movementStartPosition.x;
-                // Keep X locked to the grid line
-                proposedPosition = SnapToGridLine(proposedPosition, false);
-            }
-            else // X-axis movement only (horizontal)
-            {
-                proposedPosition.y = movementStartPosition.y;
-                // Keep Y locked to the grid line
-                proposedPosition = SnapToGridLine(proposedPosition, true);
-            }
 
             // Keep Z position consistent
             proposedPosition.z = currentPosition.z;
@@ -389,6 +287,12 @@ public class ProbeDots : MonoBehaviour
         {
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
             {
+                // Exit displacement mode first (bake deformation and switch back to 8-line display)
+                if (gridDeformation != null)
+                {
+                    gridDeformation.ExitDisplacementMode();
+                }
+
                 probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
                 selectedProbeIndex = -1; // Deselect probe
 
@@ -402,6 +306,12 @@ public class ProbeDots : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            // Exit displacement mode if active
+            if (gridDeformation != null)
+            {
+                gridDeformation.ExitDisplacementMode();
+            }
+
             // Deselect all probes
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
             {

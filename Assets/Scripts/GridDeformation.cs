@@ -22,6 +22,22 @@ public class GridDeformation : MonoBehaviour
     // Movement threshold - only deform if probe moved more than this distance
     private float movementThreshold = 0.01f;
 
+    // Displacement mode tracking
+    private bool isInDisplacementMode = false;
+    private GameObject activeProbe = null;
+    private Vector3 activeProbeStartPosition;
+    private Vector3 lastMovementDirection = Vector3.zero; // Track movement direction for dynamic deformation
+
+    // 4-line displacement mode storage
+    private List<LineRenderer> displacementLines = new List<LineRenderer>();
+    private Dictionary<LineRenderer, DisplacementLineInfo> displacementLineData = new Dictionary<LineRenderer, DisplacementLineInfo>();
+
+    // Dynamic deformation directions (calculated based on movement)
+    private Vector3[] deformationDirections = new Vector3[4];
+
+    // Store which line segments should be hidden during displacement mode
+    private List<LineRendererInfo> hiddenSegments = new List<LineRendererInfo>();
+
     // Initialization of Amsler Grid's deformation process
     void Start()
     {
@@ -56,8 +72,14 @@ public class GridDeformation : MonoBehaviour
         if (!enableDeformation) // Skip if the deformation has been disabled
             return;
 
-        // Update grid line deformations based on probe positions
-        UpdateGridDeformation();
+        // Check if we should enter or update displacement mode
+        if (isInDisplacementMode)
+        {
+            // Update the 4 displacement lines (these replace the hidden grid segments)
+            UpdateDisplacementLines();
+        }
+        // NOTE: In selection mode, we don't update deformations continuously
+        // The deformations are "baked" when exiting displacement mode and persist until the next displacement
     }
 
     // FUNCTION: Organize all grid lines into horizontal and vertical dictionaries
@@ -104,7 +126,9 @@ public class GridDeformation : MonoBehaviour
             {
                 lineRenderer = lr,
                 originalStart = start,
-                originalEnd = end
+                originalEnd = end,
+                initialStart = start,      // Store truly original positions
+                initialEnd = end           // Store truly original positions
             };
 
             // Determine if this is a horizontal or vertical line
@@ -361,14 +385,684 @@ public class GridDeformation : MonoBehaviour
             lr.SetPosition(1, lineInfo.originalEnd);
         }
     }
+
+    // ============== DISPLACEMENT MODE METHODS ==============
+
+    // FUNCTION: Calculate 4 deformation directions based on movement direction
+    // Creates perpendicular and parallel directions for the 4-line deformation pattern
+    private void CalculateDeformationDirections(Vector3 movementDir)
+    {
+        // Normalize the movement direction
+        if (movementDir.magnitude < 0.01f)
+        {
+            // Default to cardinal directions if no significant movement
+            deformationDirections[0] = Vector3.up;
+            deformationDirections[1] = Vector3.down;
+            deformationDirections[2] = Vector3.left;
+            deformationDirections[3] = Vector3.right;
+            return;
+        }
+
+        movementDir.Normalize();
+
+        // Calculate perpendicular direction (rotate 90 degrees in 2D)
+        Vector3 perpendicular = new Vector3(-movementDir.y, movementDir.x, 0f);
+
+        // Create 4 directions: forward, backward, left-perpendicular, right-perpendicular
+        deformationDirections[0] = movementDir;          // Forward (along movement)
+        deformationDirections[1] = -movementDir;         // Backward (opposite movement)
+        deformationDirections[2] = perpendicular;        // Left perpendicular
+        deformationDirections[3] = -perpendicular;       // Right perpendicular
+    }
+
+    // PUBLIC: Enter displacement mode when probe starts moving
+    public void EnterDisplacementMode(GameObject probe)
+    {
+        if (probe == null || isInDisplacementMode)
+            return;
+
+        // SAFETY: Ensure all lines are visible (but keep their deformed state)
+        EnsureAllLinesVisible();
+
+        activeProbe = probe;
+        activeProbeStartPosition = probe.transform.position;
+        isInDisplacementMode = true;
+        lastMovementDirection = Vector3.zero;
+
+        // Initialize with default cardinal directions
+        CalculateDeformationDirections(Vector3.zero);
+
+        // Note: We DON'T hide segments initially - only after we determine movement direction
+        // The grid lines need to stay visible to be deformed in real-time
+
+        // Generate the 4 continuous displacement lines
+        GenerateDisplacementLines(probe);
+    }
+
+    // FUNCTION: Reset all line segments to their original 2-point configuration
+    private void ResetAllLinesToOriginal()
+    {
+        foreach (var kvp in horizontalLines)
+        {
+            ResetLineRenderers(kvp.Value);
+        }
+        foreach (var kvp in verticalLines)
+        {
+            ResetLineRenderers(kvp.Value);
+        }
+    }
+
+    // PUBLIC: Exit displacement mode and bake deformation
+    public void ExitDisplacementMode()
+    {
+        if (!isInDisplacementMode)
+            return;
+
+        // FIRST: Show the hidden segments again (so we can modify them)
+        ShowHiddenSegments();
+
+        // SAFETY: Ensure all grid lines are visible
+        EnsureAllLinesVisible();
+
+        // THEN: Bake the deformation to the now-visible segments
+        BakeDeformationToSegments();
+
+        // Clean up displacement lines
+        foreach (LineRenderer lr in displacementLines)
+        {
+            if (lr != null)
+                Destroy(lr.gameObject);
+        }
+        displacementLines.Clear();
+        displacementLineData.Clear();
+
+        // CRITICAL: Double-check that ALL segments are visible and have valid positions
+        ValidateAllSegments();
+
+        // Reset state
+        isInDisplacementMode = false;
+        activeProbe = null;
+    }
+
+    // FUNCTION: Validate that all segments are properly visible with valid geometry
+    private void ValidateAllSegments()
+    {
+        foreach (var kvp in horizontalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (lineInfo.lineRenderer != null)
+                {
+                    // Ensure enabled
+                    if (!lineInfo.lineRenderer.enabled)
+                    {
+                        lineInfo.lineRenderer.enabled = true;
+                    }
+
+                    // Ensure has at least 2 points
+                    if (lineInfo.lineRenderer.positionCount < 2)
+                    {
+                        lineInfo.lineRenderer.positionCount = 2;
+                        lineInfo.lineRenderer.SetPosition(0, lineInfo.originalStart);
+                        lineInfo.lineRenderer.SetPosition(1, lineInfo.originalEnd);
+                    }
+                }
+            }
+        }
+
+        foreach (var kvp in verticalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (lineInfo.lineRenderer != null)
+                {
+                    // Ensure enabled
+                    if (!lineInfo.lineRenderer.enabled)
+                    {
+                        lineInfo.lineRenderer.enabled = true;
+                    }
+
+                    // Ensure has at least 2 points
+                    if (lineInfo.lineRenderer.positionCount < 2)
+                    {
+                        lineInfo.lineRenderer.positionCount = 2;
+                        lineInfo.lineRenderer.SetPosition(0, lineInfo.originalStart);
+                        lineInfo.lineRenderer.SetPosition(1, lineInfo.originalEnd);
+                    }
+                }
+            }
+        }
+    }
+
+    // FUNCTION: Generate 4 continuous lines for displacement mode (dynamic directions)
+    private void GenerateDisplacementLines(GameObject probe)
+    {
+        if (probe == null)
+            return;
+
+        Vector3 probePos = probe.transform.position;
+
+        // Generate 4 lines in the calculated deformation directions
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 direction = deformationDirections[i];
+
+            // Find the endpoint by raycasting to grid border or finding nearest probe
+            Vector3 endPoint = FindEndpointInDirection(probePos, direction, out GameObject endProbe);
+            bool endIsProbe = endProbe != null;
+
+            // Create a new LineRenderer for this direction
+            GameObject lineObj = new GameObject($"DisplacementLine_{i}");
+            lineObj.transform.SetParent(transform);
+            LineRenderer lr = lineObj.AddComponent<LineRenderer>();
+
+            // Configure the line renderer (match grid line appearance)
+            lr.startWidth = 0.15f;
+            lr.endWidth = 0.15f;
+            lr.material = new Material(Shader.Find("Sprites/Default"));
+            lr.startColor = Color.white;
+            lr.endColor = Color.white;
+            lr.positionCount = 2;
+            lr.sortingOrder = 1; // Draw above grid lines
+
+            // Set initial positions
+            lr.SetPosition(0, probePos);
+            lr.SetPosition(1, endPoint);
+
+            // Store line information
+            DisplacementLineInfo info = new DisplacementLineInfo
+            {
+                startPoint = probePos,
+                endPoint = endPoint,
+                startIsProbe = true,
+                endIsProbe = endIsProbe,
+                endProbeObject = endProbe,
+                directionVector = direction
+            };
+
+            displacementLines.Add(lr);
+            displacementLineData[lr] = info;
+        }
+    }
+
+    // FUNCTION: Find endpoint in a given direction (grid border or nearest probe)
+    private Vector3 FindEndpointInDirection(Vector3 startPos, Vector3 direction, out GameObject hitProbe)
+    {
+        hitProbe = null;
+
+        float halfWidth = mainGrid.TotalGridWidth / 2f;
+        Vector3 gridCenter = mainGrid.GridCenterPosition;
+
+        // Calculate grid boundaries
+        float leftBound = gridCenter.x - halfWidth;
+        float rightBound = gridCenter.x + halfWidth;
+        float bottomBound = gridCenter.y - halfWidth;
+        float topBound = gridCenter.y + halfWidth;
+
+        // Cast a ray from probe position in the given direction to find endpoint
+        // Maximum distance is the grid diagonal
+        float maxDistance = mainGrid.TotalGridWidth * 1.5f;
+
+        // Check for probe intersections along the direction
+        float closestProbeDistance = maxDistance;
+        GameObject closestProbe = null;
+
+        foreach (GameObject probe in probeDots.probes)
+        {
+            if (probe == null || !probe.activeInHierarchy)
+                continue;
+
+            Vector3 probePos = probe.transform.position;
+            Vector3 toProbe = probePos - startPos;
+
+            // Skip if it's the same probe or behind us
+            if (toProbe.magnitude < 0.1f)
+                continue;
+
+            // Project toProbe onto direction to see if probe is along the ray
+            float dotProduct = Vector3.Dot(toProbe.normalized, direction);
+
+            // Probe is roughly in this direction (within 20 degrees) - more strict
+            if (dotProduct > 0.94f) // cos(20°) ≈ 0.94 (was 0.866 for 30°)
+            {
+                float distance = toProbe.magnitude;
+                if (distance < closestProbeDistance)
+                {
+                    closestProbeDistance = distance;
+                    closestProbe = probe;
+                }
+            }
+        }
+
+        if (closestProbe != null)
+        {
+            hitProbe = closestProbe;
+            return closestProbe.transform.position;
+        }
+
+        // No probe found, calculate intersection with grid border
+        Vector3 endPoint = startPos + direction * maxDistance;
+
+        // Clamp to grid boundaries
+        float t = maxDistance;
+
+        // Check intersection with each boundary
+        if (direction.x > 0.01f)
+        {
+            float tRight = (rightBound - startPos.x) / direction.x;
+            if (tRight > 0 && tRight < t) t = tRight;
+        }
+        else if (direction.x < -0.01f)
+        {
+            float tLeft = (leftBound - startPos.x) / direction.x;
+            if (tLeft > 0 && tLeft < t) t = tLeft;
+        }
+
+        if (direction.y > 0.01f)
+        {
+            float tTop = (topBound - startPos.y) / direction.y;
+            if (tTop > 0 && tTop < t) t = tTop;
+        }
+        else if (direction.y < -0.01f)
+        {
+            float tBottom = (bottomBound - startPos.y) / direction.y;
+            if (tBottom > 0 && tBottom < t) t = tBottom;
+        }
+
+        endPoint = startPos + direction * t;
+        endPoint.z = startPos.z; // Keep same Z
+
+        return endPoint;
+    }
+
+    // FUNCTION: Update displacement lines in real-time as probe moves
+    private void UpdateDisplacementLines()
+    {
+        if (activeProbe == null)
+            return;
+
+        Vector3 currentProbePos = activeProbe.transform.position;
+        Vector3 movementDir = currentProbePos - activeProbeStartPosition;
+
+        // Update deformation directions based on current movement ONCE when movement starts
+        // Only recalculate on first significant movement, then lock it
+        if (movementDir.magnitude > 0.5f && lastMovementDirection.magnitude < 0.1f)
+        {
+            // Recalculate deformation directions based on initial movement
+            CalculateDeformationDirections(movementDir);
+            lastMovementDirection = movementDir;
+
+            // Regenerate displacement lines with new directions
+            RegenerateDisplacementLines();
+
+            // NOW hide segments along the displacement line paths (not the grid lines being deformed)
+            // Only hide segments that are very close to the 4 displacement line paths
+            UpdateHiddenSegments();
+        }
+
+        // Update existing line positions (always update, don't regenerate)
+        foreach (LineRenderer lr in displacementLines)
+        {
+            if (!displacementLineData.ContainsKey(lr))
+                continue;
+
+            DisplacementLineInfo info = displacementLineData[lr];
+
+            // Update start position (probe moves)
+            lr.SetPosition(0, currentProbePos);
+
+            // Recalculate endpoint based on current direction
+            Vector3 endPoint = FindEndpointInDirection(currentProbePos, info.directionVector, out GameObject endProbe);
+            lr.SetPosition(1, endPoint);
+
+            // Update info
+            info.endPoint = endPoint;
+            info.endProbeObject = endProbe;
+            info.endIsProbe = endProbe != null;
+        }
+    }
+
+    // FUNCTION: Regenerate displacement lines with new directions
+    private void RegenerateDisplacementLines()
+    {
+        if (activeProbe == null)
+            return;
+
+        // Clean up old lines
+        foreach (LineRenderer lr in displacementLines)
+        {
+            if (lr != null)
+                Destroy(lr.gameObject);
+        }
+        displacementLines.Clear();
+        displacementLineData.Clear();
+
+        // Generate new lines
+        GenerateDisplacementLines(activeProbe);
+    }
+
+    // FUNCTION: Update hidden segments when directions change
+    private void UpdateHiddenSegments()
+    {
+        // Show previously hidden segments
+        foreach (LineRendererInfo lineInfo in hiddenSegments)
+        {
+            if (lineInfo.lineRenderer != null)
+            {
+                lineInfo.lineRenderer.enabled = true;
+            }
+        }
+        hiddenSegments.Clear();
+
+        // Hide segments for new directions
+        if (activeProbe != null)
+        {
+            HideSegmentsAroundProbe(activeProbe);
+        }
+    }
+
+    // FUNCTION: Bake deformation from 4 lines back to all segments along the paths
+    private void BakeDeformationToSegments()
+    {
+        if (activeProbe == null || !probeGridLineMap.ContainsKey(activeProbe))
+            return;
+
+        GridLineInfo probeInfo = probeGridLineMap[activeProbe];
+        Vector3 currentProbePos = activeProbe.transform.position;
+        Vector3 originalProbePos = probeInfo.originalPosition;
+
+        // For each of the 4 dynamic directions, deform all segments along the path
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 direction = deformationDirections[i];
+
+            // Find endpoint using current probe position
+            Vector3 endPoint = FindEndpointInDirection(currentProbePos, direction, out GameObject endProbe);
+
+            // Also calculate the original endpoint (before probe moved)
+            Vector3 originalEndPoint = FindEndpointInDirection(originalProbePos, direction, out GameObject originalEndProbe);
+
+            // Apply deformation to all segments along this dynamic path
+            BakeDeformationAlongDynamicPath(currentProbePos, originalProbePos, endPoint, originalEndPoint);
+        }
+    }
+
+    // FUNCTION: Bake deformation to all segments along a dynamic (potentially diagonal) path
+    private void BakeDeformationAlongDynamicPath(Vector3 probeCurrentPos, Vector3 probeOriginalPos, Vector3 endCurrentPos, Vector3 endOriginalPos)
+    {
+        // Define corridor width for affected segments - narrower to only affect nearby segments
+        float corridorWidth = 0.2f; // Reduced from 0.5f
+
+        // Use a HashSet to track which segments we've already deformed (prevent double-deformation)
+        HashSet<LineRenderer> deformedSegments = new();
+
+        // Check all horizontal segments
+        foreach (var kvp in horizontalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (!deformedSegments.Contains(lineInfo.lineRenderer))
+                {
+                    if (TryDeformSegmentAlongPath(lineInfo, probeCurrentPos, probeOriginalPos, endCurrentPos, endOriginalPos, corridorWidth))
+                    {
+                        deformedSegments.Add(lineInfo.lineRenderer);
+                    }
+                }
+            }
+        }
+
+        // Check all vertical segments
+        foreach (var kvp in verticalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (!deformedSegments.Contains(lineInfo.lineRenderer))
+                {
+                    if (TryDeformSegmentAlongPath(lineInfo, probeCurrentPos, probeOriginalPos, endCurrentPos, endOriginalPos, corridorWidth))
+                    {
+                        deformedSegments.Add(lineInfo.lineRenderer);
+                    }
+                }
+            }
+        }
+    }
+
+    // FUNCTION: Try to deform a segment if it's near the deformation path
+    private bool TryDeformSegmentAlongPath(LineRendererInfo lineInfo, Vector3 probeCurrentPos, Vector3 probeOriginalPos, Vector3 endCurrentPos, Vector3 endOriginalPos, float corridorWidth)
+    {
+        // Skip if segment is null or currently hidden
+        if (lineInfo == null || lineInfo.lineRenderer == null)
+            return false;
+
+        // Use initial positions for path detection
+        Vector3 segStart = lineInfo.initialStart;
+        Vector3 segEnd = lineInfo.initialEnd;
+        Vector3 segMid = (segStart + segEnd) / 2f;
+
+        // Calculate the original path vector
+        Vector3 originalPathVector = endOriginalPos - probeOriginalPos;
+        float originalPathLength = originalPathVector.magnitude;
+
+        if (originalPathLength < 0.01f)
+            return false;
+
+        // Check if segment midpoint is near the ORIGINAL path
+        Vector3 toMid = segMid - probeOriginalPos;
+        float t = Vector3.Dot(toMid, originalPathVector) / (originalPathLength * originalPathLength);
+
+        // Check if projection is within path bounds (with margin)
+        if (t < -0.1f || t > 1.1f)
+            return false;
+
+        // Calculate closest point on original path
+        Vector3 closestPointOnOriginalPath = probeOriginalPos + originalPathVector * Mathf.Clamp01(t);
+
+        // Check distance from segment midpoint to original path
+        float distanceToPath = Vector3.Distance(segMid, closestPointOnOriginalPath);
+
+        if (distanceToPath >= corridorWidth)
+            return false;
+
+        // Segment is within corridor - deform it
+        // Calculate where segment endpoints should be on the deformed path
+        Vector3 currentPathVector = endCurrentPos - probeCurrentPos;
+
+        // Calculate projection factors for segment endpoints
+        Vector3 toStart = segStart - probeOriginalPos;
+        Vector3 toEnd = segEnd - probeOriginalPos;
+
+        float tStart = Vector3.Dot(toStart, originalPathVector) / (originalPathLength * originalPathLength);
+        float tEnd = Vector3.Dot(toEnd, originalPathVector) / (originalPathLength * originalPathLength);
+
+        // Clamp to [0, 1]
+        tStart = Mathf.Clamp01(tStart);
+        tEnd = Mathf.Clamp01(tEnd);
+
+        // Calculate new positions along the current (deformed) path
+        Vector3 newStart = Vector3.Lerp(probeCurrentPos, endCurrentPos, tStart);
+        Vector3 newEnd = Vector3.Lerp(probeCurrentPos, endCurrentPos, tEnd);
+
+        // Validate the new positions are reasonable
+        float newLength = Vector3.Distance(newStart, newEnd);
+        float originalLength = Vector3.Distance(segStart, segEnd);
+
+        // Sanity check: don't deform if it would stretch segment more than 3x or shrink less than 0.3x
+        if (newLength > originalLength * 3f || newLength < originalLength * 0.3f)
+        {
+            return false;
+        }
+
+        // Apply deformation
+        LineRenderer lr = lineInfo.lineRenderer;
+        lr.positionCount = 2;
+        lr.SetPosition(0, newStart);
+        lr.SetPosition(1, newEnd);
+
+        // Ensure visible
+        if (!lr.enabled)
+        {
+            lr.enabled = true;
+        }
+
+        // Update stored positions for future deformations
+        lineInfo.originalStart = newStart;
+        lineInfo.originalEnd = newEnd;
+
+        return true;
+    }
+
+    // FUNCTION: Hide ONLY segments along the 4 specific paths from probe to neighbors/borders
+    private void HideSegmentsAroundProbe(GameObject probe)
+    {
+        if (!probeGridLineMap.ContainsKey(probe))
+            return;
+
+        hiddenSegments.Clear();
+
+        // Use current position for dynamic direction calculation
+        Vector3 probePos = probe.transform.position;
+
+        // For each deformation direction, hide segments along the path
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 direction = deformationDirections[i];
+
+            // Find endpoint for this direction
+            Vector3 endPoint = FindEndpointInDirection(probePos, direction, out GameObject endProbe);
+
+            // Hide segments along this path
+            HideSegmentsAlongDynamicPath(probePos, endPoint);
+        }
+    }
+
+    // FUNCTION: Hide segments along a dynamic (potentially diagonal) path
+    private void HideSegmentsAlongDynamicPath(Vector3 startPos, Vector3 endPos)
+    {
+        // Calculate path characteristics
+        Vector3 pathVector = endPos - startPos;
+        float pathLength = pathVector.magnitude;
+
+        if (pathLength < 0.1f)
+            return;
+
+        // Define a "corridor" width for hiding segments - very narrow to avoid hiding too much
+        float corridorWidth = 0.15f; // Width of influence around the path
+
+        // Check all horizontal line segments
+        foreach (var kvp in horizontalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (IsSegmentNearPath(lineInfo.initialStart, lineInfo.initialEnd, startPos, endPos, corridorWidth))
+                {
+                    lineInfo.lineRenderer.enabled = false;
+                    if (!hiddenSegments.Contains(lineInfo))
+                    {
+                        hiddenSegments.Add(lineInfo);
+                    }
+                }
+            }
+        }
+
+        // Check all vertical line segments
+        foreach (var kvp in verticalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (IsSegmentNearPath(lineInfo.initialStart, lineInfo.initialEnd, startPos, endPos, corridorWidth))
+                {
+                    lineInfo.lineRenderer.enabled = false;
+                    if (!hiddenSegments.Contains(lineInfo))
+                    {
+                        hiddenSegments.Add(lineInfo);
+                    }
+                }
+            }
+        }
+    }
+
+    // FUNCTION: Check if a line segment is near a path (within corridor width)
+    private bool IsSegmentNearPath(Vector3 segStart, Vector3 segEnd, Vector3 pathStart, Vector3 pathEnd, float corridorWidth)
+    {
+        // Check if segment midpoint is within the path corridor
+        Vector3 segMid = (segStart + segEnd) / 2f;
+
+        // Calculate closest point on path to segment midpoint
+        Vector3 pathVector = pathEnd - pathStart;
+        float pathLength = pathVector.magnitude;
+
+        if (pathLength < 0.01f)
+            return false;
+
+        // Project segment midpoint onto path
+        Vector3 toMid = segMid - pathStart;
+        float t = Vector3.Dot(toMid, pathVector) / (pathLength * pathLength);
+
+        // Check if projection is within path bounds (with some margin)
+        if (t < -0.1f || t > 1.1f)
+            return false;
+
+        // Calculate closest point on path
+        Vector3 closestPointOnPath = pathStart + pathVector * Mathf.Clamp01(t);
+
+        // Check distance from segment midpoint to path
+        float distance = Vector3.Distance(segMid, closestPointOnPath);
+
+        return distance < corridorWidth;
+    }
+
+    // FUNCTION: Show previously hidden segments
+    private void ShowHiddenSegments()
+    {
+        int shownCount = 0;
+        foreach (LineRendererInfo lineInfo in hiddenSegments)
+        {
+            if (lineInfo.lineRenderer != null)
+            {
+                lineInfo.lineRenderer.enabled = true;
+                shownCount++;
+            }
+        }
+        hiddenSegments.Clear();
+    }
+
+    // FUNCTION: Safety check to ensure all grid lines are visible
+    private void EnsureAllLinesVisible()
+    {
+        // Go through all horizontal lines
+        foreach (var kvp in horizontalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (lineInfo.lineRenderer != null && !lineInfo.lineRenderer.enabled)
+                {
+                    lineInfo.lineRenderer.enabled = true;
+                }
+            }
+        }
+
+        // Go through all vertical lines
+        foreach (var kvp in verticalLines)
+        {
+            foreach (LineRendererInfo lineInfo in kvp.Value)
+            {
+                if (lineInfo.lineRenderer != null && !lineInfo.lineRenderer.enabled)
+                {
+                    lineInfo.lineRenderer.enabled = true;
+                }
+            }
+        }
+    }
 }
 
 // Helper class to store LineRenderer with its original positions
 public class LineRendererInfo
 {
     public LineRenderer lineRenderer;
-    public Vector3 originalStart;
-    public Vector3 originalEnd;
+    public Vector3 originalStart;          // Current baseline (gets updated after deformations)
+    public Vector3 originalEnd;            // Current baseline (gets updated after deformations)
+    public Vector3 initialStart;           // TRULY original position (never changes)
+    public Vector3 initialEnd;             // TRULY original position (never changes)
 }
 
 // Helper class to store grid line information for each probe
@@ -386,4 +1080,15 @@ public class DeformationPoint
     public float xCoord; // For horizontal lines, track x position
     public float yCoord; // For vertical lines, track y position
     public Vector3 displacement;
+}
+
+// Helper class for displacement line information (4-line mode)
+public class DisplacementLineInfo
+{
+    public Vector3 startPoint;        // Fixed endpoint (probe or border)
+    public Vector3 endPoint;          // Fixed endpoint (neighbor probe or border)
+    public bool startIsProbe;         // Is start point the active probe?
+    public bool endIsProbe;           // Is end point a probe?
+    public GameObject endProbeObject; // Reference if end is a probe
+    public Vector3 directionVector;   // Dynamic direction vector
 }

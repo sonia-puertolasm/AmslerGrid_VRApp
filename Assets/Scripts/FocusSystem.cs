@@ -14,7 +14,6 @@ public class FocusSystem : MonoBehaviour
 
     // Definition of parameters focus system related
     private bool isInFocusMode = false;
-    private Vector2Int lastProbeGridPosition = new Vector2Int(-1, -1);
 
     // Store original probe visibility states
     private Dictionary<GameObject, bool> originalProbeVisibility = new Dictionary<GameObject, bool>();
@@ -79,6 +78,7 @@ public class FocusSystem : MonoBehaviour
     {
         isInFocusMode = true;
         HideAllProbesExcept(probeIndex);
+        // Update focus area immediately when entering focus mode
         UpdateFocusArea(probeIndex);
     }
 
@@ -91,7 +91,6 @@ public class FocusSystem : MonoBehaviour
         }
 
         isInFocusMode = false;
-        lastProbeGridPosition = new Vector2Int(-1, -1); // Resets the position to an impossible index to ensure successful detection afterwards
 
         RestoreAllLines(); // Call function for restoring of the full grid
         RestoreProbeVisibility(); // Restore visibility of all probe dots
@@ -100,11 +99,14 @@ public class FocusSystem : MonoBehaviour
     // FUNCTION: Update of the focus area while remaining in focus mode with the displacement of the probe dot
     private void UpdateFocusArea(int probeIndex)
     {
-        Vector2Int gridPos = GetProbeGridCoordinates(probeIndex);
-        if (gridPos != lastProbeGridPosition)
+        // Always update the focus area based on the current probe position
+        if (probeIndex >= 0 && probeIndex < probeDots.probes.Count)
         {
-            ShowOnlyFocusLines(gridPos);
-            lastProbeGridPosition = gridPos;
+            GameObject probe = probeDots.probes[probeIndex];
+            if (probe != null)
+            {
+                ShowOnlyFocusLines(probe.transform.position);
+            }
         }
     }
 
@@ -131,12 +133,9 @@ public class FocusSystem : MonoBehaviour
     }
 
     // Display only the grid line segments for a 2x2 area around the probe, plus external boundaries
-    private void ShowOnlyFocusLines(Vector2Int gridPos)
+    private void ShowOnlyFocusLines(Vector3 probeWorldPos)
     {
-        int row = gridPos.x; // X-axis: rows
-        int col = gridPos.y; // Y-axis: columns
-
-        // Calculate world position boundaries for the 2x2 focus area
+        // Calculate world position boundaries for the 2x2 focus area centered on probe position
         MainGrid mainGrid = FindObjectOfType<MainGrid>();
         if (mainGrid == null) return;
 
@@ -145,11 +144,12 @@ public class FocusSystem : MonoBehaviour
         float originX = gridCenter.x - halfWidth;
         float originY = gridCenter.y - halfWidth;
 
-        // Calculate focus area bounds in world coordinates (2x2 cells)
-        float focusMinX = originX + (col - 1) * cellSize;
-        float focusMaxX = originX + (col + 1) * cellSize;
-        float focusMinY = originY + (row - 1) * cellSize;
-        float focusMaxY = originY + (row + 1) * cellSize;
+        // Calculate focus area bounds in world coordinates (2x2 cells centered on probe position)
+        // The focus area is 2 cells wide and 2 cells tall, centered on the probe
+        float focusMinX = probeWorldPos.x - cellSize;
+        float focusMaxX = probeWorldPos.x + cellSize;
+        float focusMinY = probeWorldPos.y - cellSize;
+        float focusMaxY = probeWorldPos.y + cellSize;
 
         // Calculate grid boundaries
         float gridMinX = originX;
@@ -166,16 +166,18 @@ public class FocusSystem : MonoBehaviour
             {
                 if (lineInfo.lineRenderer == null) continue;
 
-                Vector3 start = lineInfo.originalStart;
-                Vector3 end = lineInfo.originalEnd;
+                // Get CURRENT positions from the LineRenderer (handles deformed lines)
+                Vector3 start = lineInfo.lineRenderer.GetPosition(0);
+                Vector3 end = lineInfo.lineRenderer.GetPosition(lineInfo.lineRenderer.positionCount - 1);
 
                 float lineMinX = Mathf.Min(start.x, end.x);
                 float lineMaxX = Mathf.Max(start.x, end.x);
                 float lineY = start.y;
 
-                // Check if segment is within focus area
+                // Check if segment is COMPLETELY within focus area
+                // Both endpoints must be within the focus bounds
                 bool inFocusArea = (lineY >= focusMinY - epsilon && lineY <= focusMaxY + epsilon) &&
-                                   (lineMaxX >= focusMinX - epsilon && lineMinX <= focusMaxX + epsilon);
+                                   (lineMinX >= focusMinX - epsilon && lineMaxX <= focusMaxX + epsilon);
 
                 // Check if segment is part of external boundaries (top or bottom edge)
                 bool isTopBoundary = Mathf.Abs(lineY - gridMaxY) < epsilon;
@@ -192,16 +194,18 @@ public class FocusSystem : MonoBehaviour
             {
                 if (lineInfo.lineRenderer == null) continue;
 
-                Vector3 start = lineInfo.originalStart;
-                Vector3 end = lineInfo.originalEnd;
+                // Get CURRENT positions from the LineRenderer (handles deformed lines)
+                Vector3 start = lineInfo.lineRenderer.GetPosition(0);
+                Vector3 end = lineInfo.lineRenderer.GetPosition(lineInfo.lineRenderer.positionCount - 1);
 
                 float lineMinY = Mathf.Min(start.y, end.y);
                 float lineMaxY = Mathf.Max(start.y, end.y);
                 float lineX = start.x;
 
-                // Check if segment is within focus area
+                // Check if segment is COMPLETELY within focus area
+                // Both endpoints must be within the focus bounds
                 bool inFocusArea = (lineX >= focusMinX - epsilon && lineX <= focusMaxX + epsilon) &&
-                                   (lineMaxY >= focusMinY - epsilon && lineMinY <= focusMaxY + epsilon);
+                                   (lineMinY >= focusMinY - epsilon && lineMaxY <= focusMaxY + epsilon);
 
                 // Check if segment is part of external boundaries (left or right edge)
                 bool isLeftBoundary = Mathf.Abs(lineX - gridMinX) < epsilon;
