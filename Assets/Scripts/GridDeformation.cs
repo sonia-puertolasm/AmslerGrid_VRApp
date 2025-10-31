@@ -78,8 +78,11 @@ public class GridDeformation : MonoBehaviour
             // Update the 4 displacement lines (these replace the hidden grid segments)
             UpdateDisplacementLines();
         }
-        // NOTE: In selection mode, we don't update deformations continuously
-        // The deformations are "baked" when exiting displacement mode and persist until the next displacement
+        else
+        {
+            // Update the deformation of all lines in the interest region of the probe dot
+            UpdateGridDeformation();
+        }
     }
 
     // FUNCTION: Organize all grid lines into horizontal and vertical dictionaries
@@ -125,10 +128,12 @@ public class GridDeformation : MonoBehaviour
             LineRendererInfo lineInfo = new LineRendererInfo
             {
                 lineRenderer = lr,
+                // Store "current baseline" parameters -> get updated after deformation -> work as a "working copy"
                 originalStart = start,
                 originalEnd = end,
-                initialStart = start,      // Store truly original positions
-                initialEnd = end           // Store truly original positions
+                // Store truly original positions -> immutable reference point
+                initialStart = start,      
+                initialEnd = end          
             };
 
             // Determine if this is a horizontal or vertical line
@@ -147,8 +152,8 @@ public class GridDeformation : MonoBehaviour
             else if (isVertical) // Calculate which grid "column" (Y-coordinates) is this -> same approach as for X-axis
             {
                 // Calculate which vertical line index this is
-                int lineIndex = Mathf.RoundToInt((start.x - originX) / cellSize);
-                if (lineIndex >= 0 && lineIndex <= gridSize)
+                int lineIndex = Mathf.RoundToInt((start.x - originX) / cellSize); // How many cells is this specific line away from the origin?
+                if (lineIndex >= 0 && lineIndex <= gridSize) // Add the information to the dictionary if the values are within valid ranges
                 {
                     verticalLines[lineIndex].Add(lineInfo);
                 }
@@ -162,10 +167,12 @@ public class GridDeformation : MonoBehaviour
         GameObject[,] gridPoints = mainGrid.GridPoints; // Creates a 2D array of all the grid points
         if (gridPoints == null) return; // Avoids errors in case the grid points are not defined
 
+        // Calculation of main grid parameters
         float cellSize = mainGrid.CellSize;
         float halfWidth = mainGrid.TotalGridWidth / 2f;
         Vector3 gridCenter = mainGrid.GridCenterPosition;
 
+        // Calclation of origin coordinates of the grid
         float originX = gridCenter.x - halfWidth;
         float originY = gridCenter.y - halfWidth;
 
@@ -205,10 +212,10 @@ public class GridDeformation : MonoBehaviour
             GameObject probe = kvp.Key;
             GridLineInfo info = kvp.Value;
 
-            if (probe == null || !probe.activeInHierarchy) continue; // Skip if the probe is missing or inactive
+            if (probe == null || !probe.activeInHierarchy) continue; // Skip if the probe dot is missing or inactive
 
-            Vector3 currentPos = probe.transform.position;
-            Vector3 displacement = currentPos - info.originalPosition; // Vector that points from where the probe started to where it is now
+            Vector3 currentPos = probe.transform.position; // Determine current position of the probe dot
+            Vector3 displacement = currentPos - info.originalPosition; // Vector that points from where the probe dot started to where it is now -> displacement vector
 
             if (displacement.magnitude > movementThreshold) // Avoids small movements that don't require deformation
             {
@@ -231,9 +238,9 @@ public class GridDeformation : MonoBehaviour
                 }
                 verticalDeformations[info.verticalLineIndex].Add(new DeformationPoint
                 {
-                    position = currentPos,
-                    yCoord = currentPos.y,
-                    displacement = displacement
+                    position = currentPos, // Full 3D position
+                    yCoord = currentPos.y, // Y-axis position
+                    displacement = displacement // How far has it moved?
                 });
             }
         }
@@ -258,16 +265,16 @@ public class GridDeformation : MonoBehaviour
         }
 
         // Update vertical lines
-        foreach (var kvp in verticalLines)
+        foreach (var kvp in verticalLines) // Iteration over all organised vertical lines
         {
-            int lineIndex = kvp.Key;
-            List<LineRendererInfo> lines = kvp.Value;
+            int lineIndex = kvp.Key; // Which vertical line are we looking at?
+            List<LineRendererInfo> lines = kvp.Value; // List of lr segments that conform this line
 
-            if (verticalDeformations.ContainsKey(lineIndex))
+            if (verticalDeformations.ContainsKey(lineIndex)) // If the line has deformation points
             {
                 // This line is affected by probe(s)
-                List<DeformationPoint> deformPoints = verticalDeformations[lineIndex];
-                UpdateVerticalLine(lines, lineIndex, deformPoints);
+                List<DeformationPoint> deformPoints = verticalDeformations[lineIndex]; // Get the list of deformation points
+                UpdateVerticalLine(lines, lineIndex, deformPoints); // Update the line segments accordingly to "bend" the line
             }
             else
             {
@@ -286,9 +293,9 @@ public class GridDeformation : MonoBehaviour
         // Iterate through each line segment that makes up this horizontal line
         foreach (LineRendererInfo lineInfo in lineSegments)
         {
-            LineRenderer lr = lineInfo.lineRenderer;
-            Vector3 originalStart = lineInfo.originalStart;
-            Vector3 originalEnd = lineInfo.originalEnd;
+            LineRenderer lr = lineInfo.lineRenderer; 
+            Vector3 originalStart = lineInfo.originalStart; 
+            Vector3 originalEnd = lineInfo.originalEnd; 
 
             // Find deformation points within this line segment
             List<DeformationPoint> relevantPoints = new List<DeformationPoint>();
@@ -312,7 +319,7 @@ public class GridDeformation : MonoBehaviour
                     lr.SetPosition(i + 1, relevantPoints[i].position);
                 }
 
-                lr.SetPosition(relevantPoints.Count + 1, originalEnd);
+                lr.SetPosition(relevantPoints.Count + 1, originalEnd);  // Create visual connection from the start through all deformed points and back to the original end point of the section
             }
             else
             {
@@ -330,6 +337,7 @@ public class GridDeformation : MonoBehaviour
         // Sort deformation points by y coordinate
         deformPoints.Sort((a, b) => a.yCoord.CompareTo(b.yCoord));
 
+        // Iterate over the different information-like parameters for each line segment
         foreach (LineRendererInfo lineInfo in lineSegments)
         {
             LineRenderer lr = lineInfo.lineRenderer;
@@ -338,6 +346,8 @@ public class GridDeformation : MonoBehaviour
 
             // Find deformation points within this line segment
             List<DeformationPoint> relevantPoints = new List<DeformationPoint>();
+
+            // Iterate over the different deformation points to find the ones that find within specific bounds of a specific segment -> added as relevantPoints
             foreach (var dp in deformPoints)
             {
                 if (dp.yCoord >= Mathf.Min(originalStart.y, originalEnd.y) &&
@@ -347,6 +357,7 @@ public class GridDeformation : MonoBehaviour
                 }
             }
 
+            // Conditional in case there is relevantPoints existing
             if (relevantPoints.Count > 0)
             {
                 // Deform this line segment
@@ -375,7 +386,7 @@ public class GridDeformation : MonoBehaviour
     {
         foreach (LineRendererInfo lineInfo in lineRenderers) // Iteration through each segment
         {
-            LineRenderer lr = lineInfo.lineRenderer;
+            LineRenderer lr = lineInfo.lineRenderer; // Obtain information in lr terms for that specific line segment
             if (lr.positionCount != 2)
             {
                 lr.positionCount = 2;
@@ -386,16 +397,13 @@ public class GridDeformation : MonoBehaviour
         }
     }
 
-    // ============== DISPLACEMENT MODE METHODS ==============
-
-    // FUNCTION: Calculate 4 deformation directions based on movement direction
-    // Creates perpendicular and parallel directions for the 4-line deformation pattern
+    // FUNCTION: Calculate 4 deformation directions based on movement direction for the 4-line deformation pattern (x4 2-line segments)
     private void CalculateDeformationDirections(Vector3 movementDir)
     {
         // Normalize the movement direction
         if (movementDir.magnitude < 0.01f)
         {
-            // Default to cardinal directions if no significant movement
+            // Default to cardinal directions if there is no significant movement
             deformationDirections[0] = Vector3.up;
             deformationDirections[1] = Vector3.down;
             deformationDirections[2] = Vector3.left;
@@ -403,12 +411,12 @@ public class GridDeformation : MonoBehaviour
             return;
         }
 
-        movementDir.Normalize();
+        movementDir.Normalize(); // Normalize magnitudes to 1 while maintaining direction
 
         // Calculate perpendicular direction (rotate 90 degrees in 2D)
         Vector3 perpendicular = new Vector3(-movementDir.y, movementDir.x, 0f);
 
-        // Create 4 directions: forward, backward, left-perpendicular, right-perpendicular
+        // Create 4 directions: forward, backward, left-perpendicular, right-perpendicular -> kind of creating like a compass
         deformationDirections[0] = movementDir;          // Forward (along movement)
         deformationDirections[1] = -movementDir;         // Backward (opposite movement)
         deformationDirections[2] = perpendicular;        // Left perpendicular
@@ -418,12 +426,14 @@ public class GridDeformation : MonoBehaviour
     // PUBLIC: Enter displacement mode when probe starts moving
     public void EnterDisplacementMode(GameObject probe)
     {
+        // Safety: ensure that the probe dot is selected and therefore defined in displacement mode
         if (probe == null || isInDisplacementMode)
             return;
 
-        // SAFETY: Ensure all lines are visible (but keep their deformed state)
+        // Safety: ensure all lines are visible (but keep their deformed state)
         EnsureAllLinesVisible();
 
+        // Definition of status variables
         activeProbe = probe;
         activeProbeStartPosition = probe.transform.position;
         isInDisplacementMode = true;
@@ -432,11 +442,11 @@ public class GridDeformation : MonoBehaviour
         // Initialize with default cardinal directions
         CalculateDeformationDirections(Vector3.zero);
 
-        // Note: We DON'T hide segments initially - only after we determine movement direction
-        // The grid lines need to stay visible to be deformed in real-time
-
         // Generate the 4 continuous displacement lines
         GenerateDisplacementLines(probe);
+
+        // Immediately hide the underlying lines that correspond to the original grid
+        HideSegmentsAroundProbe(probe);
     }
 
     // FUNCTION: Reset all line segments to their original 2-point configuration
@@ -476,7 +486,7 @@ public class GridDeformation : MonoBehaviour
         displacementLines.Clear();
         displacementLineData.Clear();
 
-        // CRITICAL: Double-check that ALL segments are visible and have valid positions
+        // Double-check that ALL segments are visible and have valid positions
         ValidateAllSegments();
 
         // Reset state
@@ -487,11 +497,11 @@ public class GridDeformation : MonoBehaviour
     // FUNCTION: Validate that all segments are properly visible with valid geometry
     private void ValidateAllSegments()
     {
-        foreach (var kvp in horizontalLines)
+        foreach (var kvp in horizontalLines) // Iterate over ALL horizontal lines
         {
             foreach (LineRendererInfo lineInfo in kvp.Value)
             {
-                if (lineInfo.lineRenderer != null)
+                if (lineInfo.lineRenderer != null) // Safety check: ensures that we are working with a rendered line
                 {
                     // Ensure enabled
                     if (!lineInfo.lineRenderer.enabled)
@@ -499,7 +509,7 @@ public class GridDeformation : MonoBehaviour
                         lineInfo.lineRenderer.enabled = true;
                     }
 
-                    // Ensure has at least 2 points
+                    // Ensure that the line i,j has at least 2 points
                     if (lineInfo.lineRenderer.positionCount < 2)
                     {
                         lineInfo.lineRenderer.positionCount = 2;
@@ -510,11 +520,11 @@ public class GridDeformation : MonoBehaviour
             }
         }
 
-        foreach (var kvp in verticalLines)
+        foreach (var kvp in verticalLines) // Iterate over ALL vertical lines
         {
             foreach (LineRendererInfo lineInfo in kvp.Value)
             {
-                if (lineInfo.lineRenderer != null)
+                if (lineInfo.lineRenderer != null) // Safety check: ensures that we are working with a rendered line
                 {
                     // Ensure enabled
                     if (!lineInfo.lineRenderer.enabled)
@@ -522,7 +532,7 @@ public class GridDeformation : MonoBehaviour
                         lineInfo.lineRenderer.enabled = true;
                     }
 
-                    // Ensure has at least 2 points
+                    // Ensure that the line i,j has at least 2 points
                     if (lineInfo.lineRenderer.positionCount < 2)
                     {
                         lineInfo.lineRenderer.positionCount = 2;
@@ -537,7 +547,7 @@ public class GridDeformation : MonoBehaviour
     // FUNCTION: Generate 4 continuous lines for displacement mode (dynamic directions)
     private void GenerateDisplacementLines(GameObject probe)
     {
-        if (probe == null)
+        if (probe == null) // Safety: ensure that we are working with a probe dot
             return;
 
         Vector3 probePos = probe.transform.position;
@@ -678,14 +688,14 @@ public class GridDeformation : MonoBehaviour
     // FUNCTION: Update displacement lines in real-time as probe moves
     private void UpdateDisplacementLines()
     {
-        if (activeProbe == null)
+        if (activeProbe == null) // Safety: return early in case there is no active probe dot
             return;
 
+        // Definition of displacement-related variables
         Vector3 currentProbePos = activeProbe.transform.position;
         Vector3 movementDir = currentProbePos - activeProbeStartPosition;
 
-        // Update deformation directions based on current movement ONCE when movement starts
-        // Only recalculate on first significant movement, then lock it
+        // Update deformation directions based on current movement ONCE when movement starts -> only recalculate if the movement is significant
         if (movementDir.magnitude > 0.5f && lastMovementDirection.magnitude < 0.1f)
         {
             // Recalculate deformation directions based on initial movement
@@ -695,8 +705,7 @@ public class GridDeformation : MonoBehaviour
             // Regenerate displacement lines with new directions
             RegenerateDisplacementLines();
 
-            // NOW hide segments along the displacement line paths (not the grid lines being deformed)
-            // Only hide segments that are very close to the 4 displacement line paths
+            // NOW hide segments along the displacement line paths (not the grid lines being deformed) -> only hide segments that are very close to the 4 displacement line paths
             UpdateHiddenSegments();
         }
 
@@ -953,32 +962,39 @@ public class GridDeformation : MonoBehaviour
         {
             foreach (LineRendererInfo lineInfo in kvp.Value)
             {
-                if (IsSegmentNearPath(lineInfo.initialStart, lineInfo.initialEnd, startPos, endPos, corridorWidth))
-                {
-                    lineInfo.lineRenderer.enabled = false;
-                    if (!hiddenSegments.Contains(lineInfo))
-                    {
-                        hiddenSegments.Add(lineInfo);
-                    }
-                }
+                if (!TryHideSegment(lineInfo, startPos, endPos, corridorWidth))
+                    continue;
             }
         }
 
-        // Check all vertical line segments
         foreach (var kvp in verticalLines)
         {
             foreach (LineRendererInfo lineInfo in kvp.Value)
             {
-                if (IsSegmentNearPath(lineInfo.initialStart, lineInfo.initialEnd, startPos, endPos, corridorWidth))
-                {
-                    lineInfo.lineRenderer.enabled = false;
-                    if (!hiddenSegments.Contains(lineInfo))
-                    {
-                        hiddenSegments.Add(lineInfo);
-                    }
-                }
+                if (!TryHideSegment(lineInfo, startPos, endPos, corridorWidth))
+                    continue;
             }
         }
+    }
+
+    private bool TryHideSegment(LineRendererInfo lineInfo, Vector3 startPos, Vector3 endPos, float corridorWidth)
+    {
+        if (lineInfo.lineRenderer == null || lineInfo.lineRenderer.positionCount < 2)
+            return false;
+
+        LineRenderer lr = lineInfo.lineRenderer;
+        Vector3 segStart = lr.GetPosition(0);
+        Vector3 segEnd = lr.GetPosition(lr.positionCount - 1);
+
+        if (!IsSegmentNearPath(segStart, segEnd, startPos, endPos, corridorWidth))
+            return false;
+
+        lr.enabled = false;
+        if (!hiddenSegments.Contains(lineInfo))
+        {
+            hiddenSegments.Add(lineInfo);
+        }
+        return true;
     }
 
     // FUNCTION: Check if a line segment is near a path (within corridor width)
