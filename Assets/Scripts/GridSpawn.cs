@@ -5,7 +5,6 @@ using UnityEngine;
 // Manages the main grid generation and configuration
 public class MainGrid : MonoBehaviour
 {
-
     // Definition of grid configuration parameters
     private int gridSize = 8;
     private float totalGridWidth = 10f;

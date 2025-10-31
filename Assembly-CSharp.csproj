@@ -68,6 +68,7 @@
     <Compile Include="Assets\Scripts\ProbeColors.cs" />
     <Compile Include="Assets\Scripts\FocusSystem.cs" />
     <Compile Include="Assets\Scripts\Old\GridSpawn_Old.cs" />
+    <Compile Include="Assets\Scripts\GridRebuildManager.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>
