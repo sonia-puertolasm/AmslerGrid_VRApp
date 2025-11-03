@@ -1,1 +1,0 @@
-# AmslerGrid_VRApp
