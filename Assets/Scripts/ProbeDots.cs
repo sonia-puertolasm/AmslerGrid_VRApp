@@ -9,7 +9,6 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
-    // Note: Grid deformation now handled automatically by GridRebuildManager
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     public float probeDotSize = 0.2f; // Size of each probe dot
@@ -17,7 +16,7 @@ public class ProbeDots : MonoBehaviour
     public float probeSpacing = 0f; // Spacing between probes
 
     public List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
-    private Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
+    public Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
     public int selectedProbeIndex = -1; // Index of the currently selected probe
 
     // Neighbor tracking for constraint application

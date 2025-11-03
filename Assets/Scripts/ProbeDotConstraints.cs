@@ -13,7 +13,7 @@ public class ProbeDotConstraints : MonoBehaviour
     private MainGrid mainGrid;
 
     // Define configuration parameters
-    public float boundaryPadding = 0.1f; // Padding from grid edges
+    public float boundaryPadding = 1.0f; // Padding from grid edges to prevent deformation from extending beyond boundaries
     private float cellSize; // Size of one grid cell - used to keep probes one cell away from neighbors
 
     // Define boundary limits variables

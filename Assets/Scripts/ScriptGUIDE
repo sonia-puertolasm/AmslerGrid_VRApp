@@ -1,0 +1,66 @@
+# Amsler Grid VR App - Script GUIDE
+
+## Grid definition and creation: GridSpawn.cs
+
+### Aim of the script
+
+Generate and manage the Amsler Grid system in Unity for visualization and interaction purposes. Creates a grid of a defined number of points and lines, configures their properties and ensures a centering and visibility of the grid within the camera's view.
+
+### Workflow of the script
+
+1. Definition of the grid configuration parameters
+2. Definition of the center fixation point parameters
+3. Definition of storage for grid lines and points
+4. Initialization of all grid-generation functions: CreateGridPoints(), DrawGrid(), SetupCenterFixationPoint(), SetupCamera()
+
+### Logic behind the script: Main functions
+
+**CreateGridPoints()**
+
+- Definition of essential parameters for grid definition: pointsPerDimension, cellSize, halfWidth
+- Definition of GridPoints GO for further collection
+- Calculation of origin point of the grid *(serves as a reference point)*: located in bottom-left corner
+- Iteration over row, column for creation of grid points
+- Association of grid points to x-y coordinates for further use
+
+**DrawGrid()**
+
+- Safety check for ensuring non-duplication of lines
+- Creation of GridLines GO for further collection
+- Calculation of grid size and half grid with for centering of the grid around certain position
+- Calculation of origin point of the grid *(serves as a reference point)*: located in bottom-left corner
+- Iteration over cells (row, column) for creation of lines -> top + right-side lines
+    - 1st row: draw bottom line
+    - 1st column: draw left line
+
+**SetupCenterFixationPoint()**
+
+- Calculation of the center index for accessing the center point of the grid
+- Access of the grid's center point
+- Modify appearance of center point to define as center fixation dot
+- Set center fixation dot as non-interactive (!isInteractable)
+- Define center fixation dot as own species (isCenterFixation) and store reference
+
+**SetupCamera()**
+
+- Retrieving of the main camera after safety check of existance of main camera *(avoids null reference errors)*
+- Centering of the main camera on the grid in both x-plane and y-plane
+- Rotation of the main camera resetted to default
+- Definition of the main camera projection as orthographic *(avoids distortion-associated artifacts)*
+- Defines padding for the viewing of the grid with a "border"
+
+### Logic behind the script: Helper functions
+
+**CreateLine()**
+
+- Creation of GO for holding the LineRenderer
+- Definition of LineRenderer-associated properties
+- Definition of start and end positions of the lines
+- Association of new line into GO
+
+**GridPointData**
+
+- Define row, col variables
+- Define isInteractable and isCenterFixation variables for identification of species
+- Define deformation status isDeformed
+- Define originalPosition and adjustedPosition for deformation tracking

@@ -2,12 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DisplacementTracker : MonoBehaviour
+public class DisplacementTracker_Old : MonoBehaviour
 {
+    // Definition of empty position dictionaries for storage of data
     private Dictionary<GameObject, Vector3> originalPositions = new Dictionary<GameObject, Vector3>();
     private Dictionary<GameObject, Vector2> currentDisplacements = new Dictionary<GameObject, Vector2>();
     private Dictionary<int, IterationDisplacementData> iterationData = new Dictionary<int, IterationDisplacementData>();
 
+    // 
     public class IterationDisplacementData
     {
         public int iteration;
