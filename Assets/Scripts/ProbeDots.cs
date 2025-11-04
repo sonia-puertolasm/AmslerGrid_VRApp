@@ -9,7 +9,7 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
-    private GridDeformation gridDeformation;
+    // Note: Grid deformation now handled automatically by GridRebuildManager
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     public float probeDotSize = 0.2f; // Size of each probe dot
@@ -48,9 +48,6 @@ public class ProbeDots : MonoBehaviour
 
         // Initialize focus system reference
         focusSystem = FindObjectOfType<FocusSystem>();
-
-        // Initialize grid deformation reference
-        gridDeformation = FindObjectOfType<GridDeformation>();
 
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
@@ -216,12 +213,6 @@ public class ProbeDots : MonoBehaviour
             {
                 isMoving = true;
                 movementStartPosition = currentPosition;
-
-                // Enter displacement mode for grid deformation
-                if (gridDeformation != null)
-                {
-                    gridDeformation.EnterDisplacementMode(selectedProbe);
-                }
             }
 
             // Normalize input direction to prevent faster diagonal movement
@@ -287,12 +278,6 @@ public class ProbeDots : MonoBehaviour
         {
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
             {
-                // Exit displacement mode for grid deformation
-                if (gridDeformation != null && isMoving)
-                {
-                    gridDeformation.ExitDisplacementMode();
-                }
-
                 // Reset movement state
                 isMoving = false;
 
@@ -352,8 +337,8 @@ public class ProbeDots : MonoBehaviour
         probeNeighbors[7] = new List<int> { 2, 4, 6 };              // Top-right: far-down(5.0), down(2.5), left(2.5)
     }
 
-    // FUNCTION: Get the INITIAL world positions of all neighbors for a given probe
-    // Uses initial positions to create fixed movement boundaries
+    // FUNCTION: Get the CURRENT world positions of all neighbors for a given probe
+    // Uses current positions to prevent overlapping with displaced neighbors
     private List<Vector3> GetNeighborPositions(int probeIndex)
     {
         List<Vector3> neighborPositions = new List<Vector3>();
@@ -365,11 +350,8 @@ public class ProbeDots : MonoBehaviour
                 if (neighborIndex >= 0 && neighborIndex < probes.Count)
                 {
                     GameObject neighborProbe = probes[neighborIndex];
-                    // Use INITIAL position instead of current position to create fixed bounds
-                    if (probeInitialPositions.ContainsKey(neighborProbe))
-                    {
-                        neighborPositions.Add(probeInitialPositions[neighborProbe]);
-                    }
+                    // Use CURRENT position to prevent overlap with displaced neighbors
+                    neighborPositions.Add(neighborProbe.transform.position);
                 }
             }
         }

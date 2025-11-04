@@ -335,6 +335,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   boundaryPadding: 0.1
+  constraintDamping: 0.3
 --- !u!4 &559093246
 Transform:
   m_ObjectHideFlags: 0

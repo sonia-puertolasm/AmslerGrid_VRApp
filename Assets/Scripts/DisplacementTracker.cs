@@ -22,7 +22,7 @@ public class DisplacementTracker : MonoBehaviour
 
         public IterationDisplacementData(int iterationNumber) // Initialize the IterationDisplacementData object
         {
-            iteration = iterationNumber; // Set-up iteration number 
+            iteration = iterationNumber; // Set-up iteration number
             probeDisplacements = new Dictionary<int, ProbeDisplacement>(); // Generation of an empty dictionary
         }
     }
@@ -38,7 +38,7 @@ public class DisplacementTracker : MonoBehaviour
         public Vector3 displacementVector3D;
         public float displacementMagnitude;
 
-        // 
+        //
         public ProbeDisplacement(int index, Vector3 origPos, Vector3 currPos)
         {
             probeIndex = index; // Probe's index
@@ -129,7 +129,7 @@ public class DisplacementTracker : MonoBehaviour
     {
         if (!isInitialized || probeDots == null) // Safety: in case the process is not initialised or there is no probe dots, return empty dictionary
         {
-            return new Dictionary<int, ProbeDisplacement>(); 
+            return new Dictionary<int, ProbeDisplacement>();
         }
 
         Dictionary<int, ProbeDisplacement> allDisplacements = new Dictionary<int, ProbeDisplacement>(); // Creates new dictionary with all displacements of mutiple probes
@@ -153,30 +153,7 @@ public class DisplacementTracker : MonoBehaviour
         ProbeDisplacement displacement = GetProbeDisplacement(probeIndex); // Obtain displacement for specific probe dot
         if (displacement == null) return false; // Safety: exit in case of null displacement
 
-        return displacement.displacementMagnitude > threshold; 
-    }
-
-    // HELPER FUNCTION: Calculates overall displacement of a probe dot
-    public float GetTotalDisplacement()
-    {
-        if (!isInitialized) return 0f; // Safety: in case of non-initialization, return empty value
-
-        float total = 0f;
-        foreach (var displacement in GetAllDisplacements().Values) // Iterate over all displacement values
-        {
-            total += displacement.displacementMagnitude; // Calculate total displacement of a specific probe dot
-        }
-
-        return total;
-    }
-
-    // HELPER FUNCTION: Get average displacement
-    public float GetAverageDisplacement()
-    {
-        if (!isInitialized || probeDots == null || probeDots.probes.Count == 0) // Safety: in case of non-initialization/non-existance of probe dots, return empty value
-            return 0f;
-
-        return GetTotalDisplacement() / probeDots.probes.Count;
+        return displacement.displacementMagnitude > threshold;
     }
 
     // FUNCTION: Capture and store the current state of all probe displacements at a specific iteration
@@ -187,7 +164,7 @@ public class DisplacementTracker : MonoBehaviour
             return;
         }
 
-        IterationDisplacementData snapshot = new IterationDisplacementData(iteration); 
+        IterationDisplacementData snapshot = new IterationDisplacementData(iteration);
 
         // Capture all current displacements for all probes
         for (int i = 0; i < probeDots.probes.Count; i++)

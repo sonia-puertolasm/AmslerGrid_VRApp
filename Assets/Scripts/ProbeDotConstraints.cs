@@ -15,6 +15,7 @@ public class ProbeDotConstraints : MonoBehaviour
     // Define configuration parameters
     public float boundaryPadding = 1.0f; // Padding from grid edges to prevent deformation from extending beyond boundaries
     private float cellSize; // Size of one grid cell - used to keep probes one cell away from neighbors
+    public float constraintDamping = 0.5f; // Damping zone before hard constraint (in world units) - probe stops this far from boundaries
 
     // Define boundary limits variables
     private float minX, maxX, minY, maxY;
@@ -64,7 +65,7 @@ public class ProbeDotConstraints : MonoBehaviour
         }
 
         // Apply boundary constraints to ensure probe stays within grid limits
-        constrainedPos = ConstrainToBoundary(constrainedPos);
+        constrainedPos = ConstrainToBoundary(constrainedPos, currentPosition);
 
         return constrainedPos;
     }
@@ -77,97 +78,78 @@ public class ProbeDotConstraints : MonoBehaviour
         return new Vector3(x, y, proposedPosition.z); // Return constrained position
     }
 
-    // FUNCTION: Constrain position within defined boundaries
-    private Vector3 ConstrainToBoundary(Vector3 position) //  Constrain position within defined boundaries
+    // FUNCTION: Constrain position with hard stop before boundaries (no clamping, no bouncing)
+    // Returns the constrained position, stopping before reaching min/max by the constraintDamping amount
+    private float ConstrainValue(float value, float currentValue, float min, float max, float stopDistance)
     {
-        float x = Mathf.Clamp(position.x, minX, maxX); // Clamp x within minX and maxX
-        float y = Mathf.Clamp(position.y, minY, maxY); // Clamp y within minY and maxY
-        return new Vector3(x, y, position.z); // Return constrained position
+        // Define the safe zone boundaries (where the probe should stop)
+        float safeMin = min + stopDistance;
+        float safeMax = max - stopDistance;
+
+        // If already at or beyond safe boundary, don't allow further movement in that direction
+        if (currentValue <= safeMin && value < currentValue)
+        {
+            // Already at/beyond min boundary, don't allow moving further left/down
+            return currentValue;
+        }
+
+        if (currentValue >= safeMax && value > currentValue)
+        {
+            // Already at/beyond max boundary, don't allow moving further right/up
+            return currentValue;
+        }
+
+        // If new position would exceed safe boundaries, clamp to safe boundary
+        if (value < safeMin)
+        {
+            return safeMin;
+        }
+        if (value > safeMax)
+        {
+            return safeMax;
+        }
+
+        // Within safe zone, allow free movement
+        return value;
+    }
+
+    // FUNCTION: Constrain position within defined boundaries
+    private Vector3 ConstrainToBoundary(Vector3 position, Vector3 currentPosition)
+    {
+        float x = ConstrainValue(position.x, currentPosition.x, minX, maxX, constraintDamping);
+        float y = ConstrainValue(position.y, currentPosition.y, minY, maxY, constraintDamping);
+        return new Vector3(x, y, position.z);
     }
 
     // FUNCTION: Constrain position based on the neighboring probes and grid boundaries
-    // Constrains movement within a fixed rectangular region defined by neighbors relative to initial position
+    // Prevents overlapping by maintaining minimum distance from neighbors' current positions
     private Vector3 ConstrainToNeighbors(Vector3 proposedPos, List<Vector3> neighbors, Vector3 currentPos, Vector3 initialPos)
     {
         Vector3 constrainedPos = proposedPos; // Start with the proposed position
 
-        // Define a fixed rectangular region based on the nearest neighbor in each cardinal direction
-        // from the probe's INITIAL position. This creates a "cell" the probe cannot leave.
+        // Minimum safe distance from neighbors to prevent overlap (increased to avoid deformation conflicts)
+        // Using full cellSize ensures probes stay far enough apart to avoid deformation overlap
+        float minDistanceFromNeighbor = cellSize * 1.0f;
 
-        // Initialize bounds to grid boundaries (used if no neighbor exists in a direction)
-        float leftBound = minX;    // Nearest obstacle to the left
-        float rightBound = maxX;   // Nearest obstacle to the right
-        float downBound = minY;    // Nearest obstacle below
-        float upBound = maxY;      // Nearest obstacle above
-
-        // Track whether each bound is set by a neighbor (true) or grid edge (false)
-        bool leftIsNeighbor = false;
-        bool rightIsNeighbor = false;
-        bool downIsNeighbor = false;
-        bool upIsNeighbor = false;
-
-        // Find the nearest neighbor in each cardinal direction from the INITIAL position
+        // Check if proposed position would be too close to any neighbor
         if (neighbors != null && neighbors.Count > 0)
         {
             foreach (Vector3 neighbor in neighbors)
             {
-                // Check if neighbor is to the LEFT of initial position (regardless of Y)
-                if (neighbor.x < initialPos.x)
-                {
-                    // Find the CLOSEST neighbor to the left (maximum X among left neighbors)
-                    if (neighbor.x > leftBound)
-                    {
-                        leftBound = neighbor.x;
-                        leftIsNeighbor = true;
-                    }
-                }
+                // Calculate distance from proposed position to this neighbor's current position
+                Vector2 proposedPos2D = new Vector2(constrainedPos.x, constrainedPos.y);
+                Vector2 neighbor2D = new Vector2(neighbor.x, neighbor.y);
 
-                // Check if neighbor is to the RIGHT of initial position (regardless of Y)
-                if (neighbor.x > initialPos.x)
-                {
-                    // Find the CLOSEST neighbor to the right (minimum X among right neighbors)
-                    if (neighbor.x < rightBound)
-                    {
-                        rightBound = neighbor.x;
-                        rightIsNeighbor = true;
-                    }
-                }
+                float distanceToNeighbor = Vector2.Distance(proposedPos2D, neighbor2D);
 
-                // Check if neighbor is BELOW initial position (regardless of X)
-                if (neighbor.y < initialPos.y)
+                // If proposed position is too close to a neighbor, reject the movement
+                if (distanceToNeighbor < minDistanceFromNeighbor)
                 {
-                    // Find the CLOSEST neighbor below (maximum Y among neighbors below)
-                    if (neighbor.y > downBound)
-                    {
-                        downBound = neighbor.y;
-                        downIsNeighbor = true;
-                    }
-                }
-
-                // Check if neighbor is ABOVE initial position (regardless of X)
-                if (neighbor.y > initialPos.y)
-                {
-                    // Find the CLOSEST neighbor above (minimum Y among neighbors above)
-                    if (neighbor.y < upBound)
-                    {
-                        upBound = neighbor.y;
-                        upIsNeighbor = true;
-                    }
+                    // Stay at current position to prevent getting too close
+                    return currentPos;
                 }
             }
         }
-
-        // Small buffer to stop "right before" a neighbor (approximately half a grid cell)
-        float neighborBuffer = cellSize * 0.5f;
-
-        // Apply constraints with appropriate padding based on whether it's a neighbor or grid edge
-        float minXConstraint = leftBound + (leftIsNeighbor ? neighborBuffer : 0);
-        float maxXConstraint = rightBound - (rightIsNeighbor ? neighborBuffer : 0);
-        float minYConstraint = downBound + (downIsNeighbor ? neighborBuffer : 0);
-        float maxYConstraint = upBound - (upIsNeighbor ? neighborBuffer : 0);
-
-        constrainedPos.x = Mathf.Clamp(constrainedPos.x, minXConstraint, maxXConstraint);
-        constrainedPos.y = Mathf.Clamp(constrainedPos.y, minYConstraint, maxYConstraint);
 
         return constrainedPos;
     }
