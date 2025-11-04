@@ -19,25 +19,33 @@ public class DisplacementTracker : MonoBehaviour
     {
         public int iteration; // Define IT number
         public Dictionary<int, ProbeDisplacement> probeDisplacements; // Definition of empty dictionary for storage of probe displacements
+
+        public IterationDisplacementData(int iterationNumber) // Initialize the IterationDisplacementData object
+        {
+            iteration = iterationNumber; // Set-up iteration number 
+            probeDisplacements = new Dictionary<int, ProbeDisplacement>(); // Generation of an empty dictionary
+        }
     }
 
     // Definition of probe displacement
-    public class ProbeDisplacement 
+    public class ProbeDisplacement
     {
+        // Definition of fields that will describe the probe state and movements
         public int probeIndex;
-        public Vector3 originalPosition;
-        public Vector3 currentPosition;
+        public Vector3 originalPosition; // Original position of the probe dot in 3D space
+        public Vector3 currentPosition; // Current position of the probe dot in 3D space
         public Vector2 displacementVector2D;
         public Vector3 displacementVector3D;
         public float displacementMagnitude;
 
+        // 
         public ProbeDisplacement(int index, Vector3 origPos, Vector3 currPos)
         {
-            probeIndex = index;
-            originalPosition = origPos;
-            currentPosition = currPos;
+            probeIndex = index; // Probe's index
+            originalPosition = origPos; // Original position of the probe dot in 3D space
+            currentPosition = currPos; // Current position of the probe dot in 3D space
 
-            displacementVector3D = currPos - origPos;
+            displacementVector3D = currPos - origPos; // Calculation of the displacement vector in 3D space
             displacementVector2D = new Vector2(displacementVector3D.x, displacementVector3D.y);
             displacementMagnitude = displacementVector3D.magnitude;
         }
@@ -154,9 +162,9 @@ public class DisplacementTracker : MonoBehaviour
         if (!isInitialized) return 0f; // Safety: in case of non-initialization, return empty value
 
         float total = 0f;
-        foreach (var displacement in GetAllDisplacements().Values)
+        foreach (var displacement in GetAllDisplacements().Values) // Iterate over all displacement values
         {
-            total += displacement.displacementMagnitude;
+            total += displacement.displacementMagnitude; // Calculate total displacement of a specific probe dot
         }
 
         return total;
@@ -174,18 +182,18 @@ public class DisplacementTracker : MonoBehaviour
     // FUNCTION: Capture and store the current state of all probe displacements at a specific iteration
     public void SaveIterationSnapshot(int iteration)
     {
-        if (!isInitialized)
+        if (!isInitialized) // Safety: exit in case there has been no initialization of the process
         {
             return;
         }
 
-        IterationDisplacementData snapshot = new IterationDisplacementData(iteration);
+        IterationDisplacementData snapshot = new IterationDisplacementData(iteration); 
 
         // Capture all current displacements for all probes
         for (int i = 0; i < probeDots.probes.Count; i++)
         {
             ProbeDisplacement displacement = GetProbeDisplacement(i);
-            if (displacement != null)
+            if (displacement != null) // In case there is displacement, incorporate in the snapchot according to the probe dot index
             {
                 snapshot.probeDisplacements[i] = displacement;
             }
@@ -194,44 +202,44 @@ public class DisplacementTracker : MonoBehaviour
         iterationHistory.Add(snapshot);
     }
 
-    // HELPER FUNCTION: 
+    // HELPER FUNCTION: Retrieve a stored snapchot matching a specific iteration number
     public IterationDisplacementData GetIteration(int iteration)
     {
         return iterationHistory.Find(iter => iter.iteration == iteration);
     }
 
-    // HELPER FUNCTION:
+    // HELPER FUNCTION: Retrieves a copy of the entire iteration history
     public List<IterationDisplacementData> GetAllIterations()
     {
         return new List<IterationDisplacementData>(iterationHistory);
     }
 
-    // HELPER FUNCTION: 
+    // HELPER FUNCTION: Returns the most recent snapshot
     public IterationDisplacementData GetLatestIteration()
     {
-        if (iterationHistory.Count == 0) return null;
+        if (iterationHistory.Count == 0) return null; // Safety: don't return any snapshot in case they don't exist
         return iterationHistory[iterationHistory.Count - 1];
     }
 
-    // HELPER FUNCTION: 
+    // HELPER FUNCTION: Clears iteration history
     public void ClearIterationHistory()
     {
         iterationHistory.Clear();
     }
 
-    // HELPER FUNCTION: 
+    // HELPER FUNCTION: Obtain iteration count from the history of probe dots
     public int GetIterationCount()
     {
         return iterationHistory.Count;
     }
 
-    // HELPER FUNCTION: 
+    // HELPER FUNCTION: Resets the tracker and iteration history
     public void ResetTracker()
     {
         ClearIterationHistory();
     }
 
-
-    public bool IsInitialized => isInitialized;
-    public int ProbeCount => probeDots != null ? probeDots.probes.Count : 0;
+    // Defined variables for further use
+    public bool IsInitialized => isInitialized; // Initialization status
+    public int ProbeCount => probeDots != null ? probeDots.probes.Count : 0; // Returns how many probe dots is there as long as there is any number except 0
 }

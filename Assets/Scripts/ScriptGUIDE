@@ -64,3 +64,137 @@ Generate and manage the Amsler Grid system in Unity for visualization and intera
 - Define isInteractable and isCenterFixation variables for identification of species
 - Define deformation status isDeformed
 - Define originalPosition and adjustedPosition for deformation tracking
+
+## Displacement tracking system: DisplacementTracker.cs
+
+### Aim of the script
+
+Track the displacement of probe objects in the given Amsler Grid system though calculation and storage of the movement of probes from their original positions.
+
+### Workflow of the script
+
+1. Definition of the grid configuration parameters and of parameters for displacement data storage
+2. Initialization with coroutine approach for ensuring Amsler Grid spawn and population with probe dots
+3. Obtaining of references to components in the Amsler Grid
+4. Computation of displacement for a probe dot
+5. Computation of displacements for all probe dots
+6. Obtaining of iteration snapshots
+
+### Logic behind the script: Main functions
+
+**InitializeTracker()**
+
+- Coroutine approach to initialize tracking after grid has been generated
+- Retrieval of GO elements from other scripts
+- Set of initialization status isInitializated to true
+
+**GetProbeDisplacement()**
+
+- Extraction of selected probe dot and its location
+- Execution of obtaining of displacement of the selected probe as difference between current and original positions
+- Definition of displacement as vector in x-y planes and magnitude
+
+**GetAllDisplacements()**
+
+- Creation of dictionary with displacements of multiple probe dots
+- Obtaining of displacement for every probe dot
+- Integration of displacement for every probe dot in dictionary
+
+**SaveIterationSnapshot()**
+
+- Definition of snapshot variable for specific iteration
+- Capturing of all current displacements for all probes in that specific iteration
+- Inclusion of displacements in specific iteration
+
+### Logic behind the script: Helper functions
+
+**HasProbeMoved()**
+
+- Obtaining of displacement for a specific probe dot
+- Threshold-based determination of movement of specific probe dot
+
+**GetTotalDisplacement()**
+
+- Iteration over all displacement values for a specific probe dot
+- Computation of total value as a summation of all displacements
+
+**GetAverageDisplacement()**
+
+- Computation of average value of displacement as the total displacement of all probes / count of probes 
+
+**IterationDisplacementData()**
+
+- Definition of IT number
+- Definition of empty dictionary for storage of probe displacements for that IT
+- Initialization of IterationDisplacementData object
+
+**GetAllIterations()**
+
+- Obtaining of a copy of all iteration history
+
+**GetLatestIteration()**
+
+- Extraction of snapshot of the [iteration-1] iteration
+
+**ClearIterationHistory()**
+
+- Reset of the iteration history
+
+**GetIterationCount()**
+
+- Exraction of count from the history of probe dots
+
+**ResetTracker()**
+
+- Overall reset of the displacement tracker system
+
+## Grid deformation system: GridDeformation.cs
+
+### Aim of the script
+
+According to the probe dot displacements, bends the Amsler Grid's line segments for ensuring that every horizontal/vertical line passes through the probe's current position through a x4 2-line continuous segments, with updated changes in the overall grid after confirmation during exit of the deformation mode.
+
+### Workflow of the script
+
+1. Definition of the grid configuration parameters and of parameters for grid lines organization
+2. Mapping of every probe dot to its corresponding grid line
+3. Definition of deformation-based and displacement-based parameters 
+4. Definition of elements and storage of 2-line continuous segments
+5. Initialization after Amsler Grid's spawn with mapping of each probe to the indices of its horizontal and vertical lines
+6. Reaction to probe movement -> collection of probes with displacement > threshold and bending of segments who span contains the probe's coordinates
+7. Guided deformation until the neighboring probe dots or the Amsler Grid's external boundaries
+
+### Logic behind the script: Main functions
+
+**InitializeDeformation()**
+
+**LateUpdate()**
+
+**OrganizeGridLines()**
+
+**MapProbesToGridLines()**
+
+**UpdateGridDeformation()**
+
+**UpdateHorizontalLine()/UpdateVerticalLine()**
+
+**EnterDisplacementMode()**
+
+**UpdateDisplacementLines()**
+
+**ExitDisplacementMode()**
+
+**BakeDeformationToSegments()**
+
+**BakeDeformationAlongDynamicPath()**
+
+### Logic behind the script: Helper functions
+
+#### Visibility and safety
+
+#### Resetting
+
+#### Displacement-line plumbing
+
+#### Path and selection 
+

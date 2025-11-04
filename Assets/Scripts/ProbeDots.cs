@@ -9,6 +9,7 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
+    private GridDeformation gridDeformation;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     public float probeDotSize = 0.2f; // Size of each probe dot
@@ -47,6 +48,9 @@ public class ProbeDots : MonoBehaviour
 
         // Initialize focus system reference
         focusSystem = FindObjectOfType<FocusSystem>();
+
+        // Initialize grid deformation reference
+        gridDeformation = FindObjectOfType<GridDeformation>();
 
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
@@ -212,6 +216,12 @@ public class ProbeDots : MonoBehaviour
             {
                 isMoving = true;
                 movementStartPosition = currentPosition;
+
+                // Enter displacement mode for grid deformation
+                if (gridDeformation != null)
+                {
+                    gridDeformation.EnterDisplacementMode(selectedProbe);
+                }
             }
 
             // Normalize input direction to prevent faster diagonal movement
@@ -277,6 +287,12 @@ public class ProbeDots : MonoBehaviour
         {
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
             {
+                // Exit displacement mode for grid deformation
+                if (gridDeformation != null && isMoving)
+                {
+                    gridDeformation.ExitDisplacementMode();
+                }
+
                 // Reset movement state
                 isMoving = false;
 
