@@ -13,9 +13,9 @@ public class ProbeDotConstraints : MonoBehaviour
     private MainGrid mainGrid;
 
     // Define configuration parameters
-    public float boundaryPadding = 1.0f; // Padding from grid edges to prevent deformation from extending beyond boundaries
+    public float boundaryPadding = 0.2f; // Padding from grid edges to prevent deformation from extending beyond boundaries
     private float cellSize; // Size of one grid cell - used to keep probes one cell away from neighbors
-    public float constraintDamping = 0.5f; // Damping zone before hard constraint (in world units) - probe stops this far from boundaries
+    public float constraintDamping = 0.15f; // Damping zone before constraint (in world units) - probe stops this far from boundaries
 
     // Define boundary limits variables
     private float minX, maxX, minY, maxY;
@@ -43,11 +43,12 @@ public class ProbeDotConstraints : MonoBehaviour
     {
         float halfSize = mainGrid.TotalGridWidth / 2f;
         Vector3 center = mainGrid.GridCenterPosition;
+        cellSize = mainGrid.CellSize;
 
-        minX = center.x - halfSize + boundaryPadding;
-        maxX = center.x + halfSize - boundaryPadding;
-        minY = center.y - halfSize + boundaryPadding;
-        maxY = center.y + halfSize - boundaryPadding;
+        minX = center.x - halfSize + cellSize + boundaryPadding;
+        maxX = center.x + halfSize - cellSize - boundaryPadding;
+        minY = center.y - halfSize + cellSize + boundaryPadding;
+        maxY = center.y + halfSize - cellSize - boundaryPadding;
 
         // Calculate cell size - this will be used as minimum distance to keep probes one cell away from neighbors
         cellSize = mainGrid.CellSize;
@@ -82,74 +83,141 @@ public class ProbeDotConstraints : MonoBehaviour
     // Returns the constrained position, stopping before reaching min/max by the constraintDamping amount
     private float ConstrainValue(float value, float currentValue, float min, float max, float stopDistance)
     {
-        // Define the safe zone boundaries (where the probe should stop)
-        float safeMin = min + stopDistance;
-        float safeMax = max - stopDistance;
-
-        // If already at or beyond safe boundary, don't allow further movement in that direction
-        if (currentValue <= safeMin && value < currentValue)
-        {
-            // Already at/beyond min boundary, don't allow moving further left/down
-            return currentValue;
-        }
-
-        if (currentValue >= safeMax && value > currentValue)
-        {
-            // Already at/beyond max boundary, don't allow moving further right/up
-            return currentValue;
-        }
-
-        // If new position would exceed safe boundaries, clamp to safe boundary
-        if (value < safeMin)
-        {
-            return safeMin;
-        }
-        if (value > safeMax)
-        {
-            return safeMax;
-        }
-
-        // Within safe zone, allow free movement
-        return value;
+        // Return the clamping value (where the probe should not be allowed to go further)
+        return Mathf.Clamp(value, min + stopDistance, max - stopDistance);
     }
 
     // FUNCTION: Constrain position within defined boundaries
     private Vector3 ConstrainToBoundary(Vector3 position, Vector3 currentPosition)
     {
-        float x = ConstrainValue(position.x, currentPosition.x, minX, maxX, constraintDamping);
-        float y = ConstrainValue(position.y, currentPosition.y, minY, maxY, constraintDamping);
+        // Define independent axis movement - constrain every axis separately
+        float x = position.x;
+        float y = position.y;
+
+        // X-axis constrain
+
+        if (x < minX + constraintDamping)
+            x = minX + constraintDamping;
+
+        else if (x > maxX - constraintDamping)
+            x = maxX - constraintDamping;
+
+        // Y-axis constrain
+
+        if (y < minY + constraintDamping)
+            y = minY + constraintDamping;
+
+        else if (y > maxY - constraintDamping)
+            y = maxY - constraintDamping;
+
+        // Return position vector
+
         return new Vector3(x, y, position.z);
     }
 
     // FUNCTION: Constrain position based on the neighboring probes and grid boundaries
-    // Prevents overlapping by maintaining minimum distance from neighbors' current positions
+    // Creates a rectangular boundary based on the nearest CARDINAL neighbors in each direction
     private Vector3 ConstrainToNeighbors(Vector3 proposedPos, List<Vector3> neighbors, Vector3 currentPos, Vector3 initialPos)
     {
-        Vector3 constrainedPos = proposedPos; // Start with the proposed position
+        if (neighbors == null || neighbors.Count == 0)
+            return proposedPos;
 
-        // Minimum safe distance from neighbors to prevent overlap (increased to avoid deformation conflicts)
-        // Using full cellSize ensures probes stay far enough apart to avoid deformation overlap
-        float minDistanceFromNeighbor = cellSize * 1.0f;
+        // Start with grid boundaries as default constraints
+        float halfSize = mainGrid.TotalGridWidth / 2f;
+        Vector3 center = mainGrid.GridCenterPosition;
 
-        // Check if proposed position would be too close to any neighbor
-        if (neighbors != null && neighbors.Count > 0)
+        float minX = center.x - halfSize + cellSize + boundaryPadding;
+        float maxX = center.x + halfSize - cellSize - boundaryPadding;
+        float minY = center.y - halfSize + cellSize + boundaryPadding;
+        float maxY = center.y + halfSize - cellSize - boundaryPadding;
+
+        // Find the NEAREST cardinal neighbor in each direction (ignore diagonals)
+        Vector3? nearestLeft = null;
+        Vector3? nearestRight = null;
+        Vector3? nearestUp = null;
+        Vector3? nearestDown = null;
+
+        float closestLeftDist = float.MaxValue;
+        float closestRightDist = float.MaxValue;
+        float closestUpDist = float.MaxValue;
+        float closestDownDist = float.MaxValue;
+
+        foreach (Vector3 neighbor in neighbors)
         {
-            foreach (Vector3 neighbor in neighbors)
+            float deltaX = neighbor.x - initialPos.x;
+            float deltaY = neighbor.y - initialPos.y;
+
+            // Check if this is primarily a horizontal neighbor (ignore if mostly diagonal)
+            if (Mathf.Abs(deltaX) > Mathf.Abs(deltaY) + 0.1f)
             {
-                // Calculate distance from proposed position to this neighbor's current position
-                Vector2 proposedPos2D = new Vector2(constrainedPos.x, constrainedPos.y);
-                Vector2 neighbor2D = new Vector2(neighbor.x, neighbor.y);
+                // Neighbor is primarily to the left or right
+                float distance = Mathf.Abs(deltaX);
 
-                float distanceToNeighbor = Vector2.Distance(proposedPos2D, neighbor2D);
-
-                // If proposed position is too close to a neighbor, reject the movement
-                if (distanceToNeighbor < minDistanceFromNeighbor)
+                if (deltaX < -0.1f && distance < closestLeftDist)
                 {
-                    // Stay at current position to prevent getting too close
-                    return currentPos;
+                    // Neighbor is to the left
+                    closestLeftDist = distance;
+                    nearestLeft = neighbor;
+                }
+                else if (deltaX > 0.1f && distance < closestRightDist)
+                {
+                    // Neighbor is to the right
+                    closestRightDist = distance;
+                    nearestRight = neighbor;
+                }
+            }
+            // Check if this is primarily a vertical neighbor
+            else if (Mathf.Abs(deltaY) > Mathf.Abs(deltaX) + 0.1f)
+            {
+                // Neighbor is primarily above or below
+                float distance = Mathf.Abs(deltaY);
+
+                if (deltaY < -0.1f && distance < closestDownDist)
+                {
+                    // Neighbor is below
+                    closestDownDist = distance;
+                    nearestDown = neighbor;
+                }
+                else if (deltaY > 0.1f && distance < closestUpDist)
+                {
+                    // Neighbor is above
+                    closestUpDist = distance;
+                    nearestUp = neighbor;
                 }
             }
         }
+
+        // Apply constraints based on nearest cardinal neighbors only
+        // If no neighbor exists in a direction, keep the grid boundary
+
+        if (nearestLeft.HasValue)
+        {
+            float midX = (initialPos.x + nearestLeft.Value.x) / 2f;
+            minX = Mathf.Max(minX, midX);
+        }
+
+        if (nearestRight.HasValue)
+        {
+            float midX = (initialPos.x + nearestRight.Value.x) / 2f;
+            maxX = Mathf.Min(maxX, midX);
+        }
+
+        if (nearestDown.HasValue)
+        {
+            float midY = (initialPos.y + nearestDown.Value.y) / 2f;
+            minY = Mathf.Max(minY, midY);
+        }
+
+        if (nearestUp.HasValue)
+        {
+            float midY = (initialPos.y + nearestUp.Value.y) / 2f;
+            maxY = Mathf.Min(maxY, midY);
+        }
+
+        // Hard clamp the proposed position to the calculated boundaries
+        Vector3 constrainedPos = proposedPos;
+        constrainedPos.x = Mathf.Clamp(proposedPos.x, minX, maxX);
+        constrainedPos.y = Mathf.Clamp(proposedPos.y, minY, maxY);
 
         return constrainedPos;
     }

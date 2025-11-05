@@ -9,7 +9,7 @@ public class FocusSystem : MonoBehaviour
 
     // Reference to the main grid, probe dots and deformation system
     private ProbeDots probeDots;
-    private GridDeformation gridDeformation;
+    private GridRebuildManager gridRebuildManager;
     private GameObject centerFixationPoint;
 
     // Definition of parameters focus system related
@@ -21,12 +21,17 @@ public class FocusSystem : MonoBehaviour
     // Grid configuration parameters
     private int gridSize;
     private float cellSize;
+    private Vector3 gridCenter;
+    private float halfWidth;
+
+    // Store probe original positions for grid index calculation
+    private Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
 
     void Start()
     {
         // Locate and introduce previously defined components
         probeDots = FindObjectOfType<ProbeDots>();
-        gridDeformation = FindObjectOfType<GridDeformation>();
+        gridRebuildManager = FindObjectOfType<GridRebuildManager>();
         centerFixationPoint = GameObject.Find("CenterFixationPoint");
 
         MainGrid mainGrid = FindObjectOfType<MainGrid>();
@@ -34,6 +39,20 @@ public class FocusSystem : MonoBehaviour
         {
             gridSize = mainGrid.GridSize;
             cellSize = mainGrid.CellSize;
+            gridCenter = mainGrid.GridCenterPosition;
+            halfWidth = mainGrid.TotalGridWidth / 2f;
+        }
+
+        // Store original probe positions for grid index calculations
+        if (probeDots != null && probeDots.probes != null)
+        {
+            foreach (GameObject probe in probeDots.probes)
+            {
+                if (probe != null)
+                {
+                    probeOriginalPositions[probe] = probe.transform.position;
+                }
+            }
         }
     }
 
@@ -45,7 +64,7 @@ public class FocusSystem : MonoBehaviour
             return;
         }
 
-        if (probeDots == null || gridDeformation == null) // Safety check in case the probe dots and/or deformation don't exist
+        if (probeDots == null || gridRebuildManager == null) // Safety check in case the probe dots and/or deformation don't exist
         {
             return;
         }
@@ -64,13 +83,6 @@ public class FocusSystem : MonoBehaviour
         {
             ExitFocusMode();
         }
-
-        // Update of focus mode with probe dot displacement
-
-        else if (isInFocusMode && currentSelectedIndex != -1)
-        {
-            UpdateFocusArea(currentSelectedIndex);
-        }
     }
 
     // FUNCTION: Entering of focus mode
@@ -78,8 +90,8 @@ public class FocusSystem : MonoBehaviour
     {
         isInFocusMode = true;
         HideAllProbesExcept(probeIndex);
-        // Update focus area immediately when entering focus mode
-        UpdateFocusArea(probeIndex);
+        // Show only the lines around the selected probe
+        ShowOnlyLinesAroundProbe(probeIndex);
     }
 
     // FUNCTION: Exit of focus mode as long as the focus mode was previously activated
@@ -96,122 +108,61 @@ public class FocusSystem : MonoBehaviour
         RestoreProbeVisibility(); // Restore visibility of all probe dots
     }
 
-    // FUNCTION: Update of the focus area while remaining in focus mode with the displacement of the probe dot
-    private void UpdateFocusArea(int probeIndex)
+    // FUNCTION: Show only the lines around the selected probe (3 horizontal + 3 vertical)
+    private void ShowOnlyLinesAroundProbe(int probeIndex)
     {
-        // Always update the focus area based on the current probe position
-        if (probeIndex >= 0 && probeIndex < probeDots.probes.Count)
-        {
-            GameObject probe = probeDots.probes[probeIndex];
-            if (probe != null)
-            {
-                ShowOnlyFocusLines(probe.transform.position);
-            }
-        }
-    }
+        if (gridRebuildManager == null || probeDots == null || probeDots.probes == null)
+            return;
 
-    // Return the grid row/column for the currently selected probe dot
-    private Vector2Int GetProbeGridCoordinates(int probeIndex)
-    {
-
-        // Safety check to ensure that the probeIndex is valid -> return invalid coordinates
         if (probeIndex < 0 || probeIndex >= probeDots.probes.Count)
+            return;
+
+        GameObject selectedProbe = probeDots.probes[probeIndex];
+        if (selectedProbe == null)
+            return;
+
+        // Get the grid position of the selected probe
+        Vector2Int probeGridPos = GetProbeGridIndex(selectedProbe);
+        int probeRow = probeGridPos.y;
+        int probeCol = probeGridPos.x;
+
+        // Hide all horizontal lines first
+        foreach (LineRenderer lr in gridRebuildManager.horizontalLinePool)
         {
-            return new Vector2Int(-1, -1);
+            if (lr != null)
+                lr.enabled = false;
         }
 
-        // Get the probe GameObject at this specific index
-        GameObject probe = probeDots.probes[probeIndex];
-
-        // Obtain the GridPointData component -> stores row/col information
-        GridPointData pointData = probe?.GetComponent<GridPointData>();
-        if (pointData != null)
+        // Hide all vertical lines first
+        foreach (LineRenderer lr in gridRebuildManager.verticalLinePool)
         {
-            return new Vector2Int(pointData.row, pointData.col);
+            if (lr != null)
+                lr.enabled = false;
         }
-        return new Vector2Int(-1, -1); // If there is no data found, return invalid vector
-    }
 
-    // Display only the grid line segments for a 2x2 area around the probe, plus external boundaries
-    private void ShowOnlyFocusLines(Vector3 probeWorldPos)
-    {
-        // Calculate world position boundaries for the 2x2 focus area centered on probe position
-        MainGrid mainGrid = FindObjectOfType<MainGrid>();
-        if (mainGrid == null) return;
-
-        float halfWidth = mainGrid.TotalGridWidth / 2f;
-        Vector3 gridCenter = mainGrid.GridCenterPosition;
-        float originX = gridCenter.x - halfWidth;
-        float originY = gridCenter.y - halfWidth;
-
-        // Calculate focus area bounds in world coordinates (2x2 cells centered on probe position)
-        // The focus area is 2 cells wide and 2 cells tall, centered on the probe
-        float focusMinX = probeWorldPos.x - cellSize;
-        float focusMaxX = probeWorldPos.x + cellSize;
-        float focusMinY = probeWorldPos.y - cellSize;
-        float focusMaxY = probeWorldPos.y + cellSize;
-
-        // Calculate grid boundaries
-        float gridMinX = originX;
-        float gridMaxX = originX + gridSize * cellSize;
-        float gridMinY = originY;
-        float gridMaxY = originY + gridSize * cellSize;
-
-        float epsilon = 0.01f; // Tolerance for float comparison
-
-        // Update visibility of all horizontal line segments
-        foreach (var kvp in gridDeformation.horizontalLines)
+        // Show 3 horizontal lines (rows: probeRow-1, probeRow, probeRow+1)
+        for (int row = probeRow - 1; row <= probeRow + 1; row++)
         {
-            foreach (var lineInfo in kvp.Value)
+            if (row >= 0 && row < gridRebuildManager.horizontalLinePool.Count)
             {
-                if (lineInfo.lineRenderer == null) continue;
-
-                // Get CURRENT positions from the LineRenderer (handles deformed lines)
-                Vector3 start = lineInfo.lineRenderer.GetPosition(0);
-                Vector3 end = lineInfo.lineRenderer.GetPosition(lineInfo.lineRenderer.positionCount - 1);
-
-                float lineMinX = Mathf.Min(start.x, end.x);
-                float lineMaxX = Mathf.Max(start.x, end.x);
-                float lineY = start.y;
-
-                // Check if segment is COMPLETELY within focus area
-                // Both endpoints must be within the focus bounds
-                bool inFocusArea = (lineY >= focusMinY - epsilon && lineY <= focusMaxY + epsilon) &&
-                                   (lineMinX >= focusMinX - epsilon && lineMaxX <= focusMaxX + epsilon);
-
-                // Check if segment is part of external boundaries (top or bottom edge)
-                bool isTopBoundary = Mathf.Abs(lineY - gridMaxY) < epsilon;
-                bool isBottomBoundary = Mathf.Abs(lineY - gridMinY) < epsilon;
-
-                lineInfo.lineRenderer.enabled = inFocusArea || isTopBoundary || isBottomBoundary;
+                LineRenderer lr = gridRebuildManager.horizontalLinePool[row];
+                if (lr != null)
+                {
+                    lr.enabled = true;
+                }
             }
         }
 
-        // Update visibility of all vertical line segments
-        foreach (var kvp in gridDeformation.verticalLines)
+        // Show 3 vertical lines (cols: probeCol-1, probeCol, probeCol+1)
+        for (int col = probeCol - 1; col <= probeCol + 1; col++)
         {
-            foreach (var lineInfo in kvp.Value)
+            if (col >= 0 && col < gridRebuildManager.verticalLinePool.Count)
             {
-                if (lineInfo.lineRenderer == null) continue;
-
-                // Get CURRENT positions from the LineRenderer (handles deformed lines)
-                Vector3 start = lineInfo.lineRenderer.GetPosition(0);
-                Vector3 end = lineInfo.lineRenderer.GetPosition(lineInfo.lineRenderer.positionCount - 1);
-
-                float lineMinY = Mathf.Min(start.y, end.y);
-                float lineMaxY = Mathf.Max(start.y, end.y);
-                float lineX = start.x;
-
-                // Check if segment is COMPLETELY within focus area
-                // Both endpoints must be within the focus bounds
-                bool inFocusArea = (lineX >= focusMinX - epsilon && lineX <= focusMaxX + epsilon) &&
-                                   (lineMinY >= focusMinY - epsilon && lineMaxY <= focusMaxY + epsilon);
-
-                // Check if segment is part of external boundaries (left or right edge)
-                bool isLeftBoundary = Mathf.Abs(lineX - gridMinX) < epsilon;
-                bool isRightBoundary = Mathf.Abs(lineX - gridMaxX) < epsilon;
-
-                lineInfo.lineRenderer.enabled = inFocusArea || isLeftBoundary || isRightBoundary;
+                LineRenderer lr = gridRebuildManager.verticalLinePool[col];
+                if (lr != null)
+                {
+                    lr.enabled = true;
+                }
             }
         }
 
@@ -226,15 +177,24 @@ public class FocusSystem : MonoBehaviour
     // FUNCTION: Restore all lines after exiting focus mode
     private void RestoreAllLines()
     {
-        foreach (var kvp in gridDeformation.horizontalLines) // Iterate over every horizontal line
-            foreach (var lineInfo in kvp.Value)
-                if (lineInfo.lineRenderer != null) lineInfo.lineRenderer.enabled = true;
+        if (gridRebuildManager == null)
+            return;
 
-        foreach (var kvp in gridDeformation.verticalLines) // Iterate over every vertical line
-            foreach (var lineInfo in kvp.Value)
-                if (lineInfo.lineRenderer != null) lineInfo.lineRenderer.enabled = true;
+        // Re-enable all GridRebuildManager lines
+        foreach (LineRenderer lr in gridRebuildManager.horizontalLinePool)
+        {
+            if (lr != null)
+                lr.enabled = true;
+        }
 
-        if (centerFixationPoint != null) // Maintain fixation point in SAME position
+        foreach (LineRenderer lr in gridRebuildManager.verticalLinePool)
+        {
+            if (lr != null)
+                lr.enabled = true;
+        }
+
+        // Maintain fixation point visibility
+        if (centerFixationPoint != null)
         {
             Renderer renderer = centerFixationPoint.GetComponent<Renderer>();
             if (renderer != null) renderer.enabled = true;
@@ -277,5 +237,31 @@ public class FocusSystem : MonoBehaviour
             }
         }
         originalProbeVisibility.Clear();
+    }
+
+    // FUNCTION: Get the grid index (row, col) of a probe based on its original position
+    private Vector2Int GetProbeGridIndex(GameObject probe)
+    {
+        Vector3 probeOriginalPos;
+
+        if (probeOriginalPositions.ContainsKey(probe))
+        {
+            probeOriginalPos = probeOriginalPositions[probe];
+        }
+        else
+        {
+            probeOriginalPos = probe.transform.position;
+        }
+
+        float originX = gridCenter.x - halfWidth;
+        float originY = gridCenter.y - halfWidth;
+
+        int col = Mathf.RoundToInt((probeOriginalPos.x - originX) / cellSize);
+        int row = Mathf.RoundToInt((probeOriginalPos.y - originY) / cellSize);
+
+        col = Mathf.Clamp(col, 0, gridSize);
+        row = Mathf.Clamp(row, 0, gridSize);
+
+        return new Vector2Int(col, row);
     }
 }

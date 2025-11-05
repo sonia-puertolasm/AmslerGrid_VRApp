@@ -360,9 +360,9 @@ MonoBehaviour:
     m_IsLocked: 0
   m_FolderTreeState:
     scrollPos: {x: 0, y: 0}
-    m_SelectedIDs: b4670000
-    m_LastClickedID: 26548
-    m_ExpandedIDs: 000000003a66000000ca9a3bffffff7f
+    m_SelectedIDs: ac670000
+    m_LastClickedID: 26540
+    m_ExpandedIDs: 000000003266000000ca9a3bffffff7f
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -390,7 +390,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: 000000003a660000
+    m_ExpandedIDs: 0000000032660000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1006,9 +1006,9 @@ MonoBehaviour:
   m_SceneHierarchy:
     m_TreeViewState:
       scrollPos: {x: 0, y: 0}
-      m_SelectedIDs: f6650000
-      m_LastClickedID: 26102
-      m_ExpandedIDs: 22fbffff
+      m_SelectedIDs: ee650000
+      m_LastClickedID: 26094
+      m_ExpandedIDs: f8f4ffff2efbffff06660000
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 

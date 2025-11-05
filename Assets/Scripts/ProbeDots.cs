@@ -278,10 +278,12 @@ public class ProbeDots : MonoBehaviour
         {
             if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
             {
+                GameObject selectedProbe = probes[selectedProbeIndex];
+
                 // Reset movement state
                 isMoving = false;
 
-                probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
+                selectedProbe.GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
                 selectedProbeIndex = -1; // Deselect probe
 
                 // Exit focus mode

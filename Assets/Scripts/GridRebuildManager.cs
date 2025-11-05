@@ -15,8 +15,8 @@ public class GridRebuildManager : MonoBehaviour
     private Vector3[,] originalGridPoints;
     private Vector3[,] currentGridPoints;
 
-    private List<LineRenderer> horizontalLinePool = new List<LineRenderer>();
-    private List<LineRenderer> verticalLinePool = new List<LineRenderer>();
+    public List<LineRenderer> horizontalLinePool = new List<LineRenderer>();
+    public List<LineRenderer> verticalLinePool = new List<LineRenderer>();
 
     public bool enableDeformation = true;
 
@@ -119,7 +119,7 @@ public class GridRebuildManager : MonoBehaviour
         Transform gridLinesParent = mainGrid.transform.Find("GridLines");
         if (gridLinesParent != null)
         {
-            gridLinesParent.gameObject.SetActive(false);
+            Destroy(gridLinesParent.gameObject);
         }
     }
 
@@ -186,9 +186,7 @@ public class GridRebuildManager : MonoBehaviour
             if (probe.transform == null)
                 continue;
 
-            if (!probe.activeInHierarchy)
-                continue;
-
+            // Track movement even for hidden probes (focus system)
             Vector3 currentPos = probe.transform.position;
             if (Vector3.Distance(currentPos, lastProbePositions[i]) > 0.001f)
             {
@@ -222,9 +220,10 @@ public class GridRebuildManager : MonoBehaviour
 
         foreach (GameObject probe in probeDots.probes)
         {
-            if (probe == null || !probe.activeInHierarchy)
+            if (probe == null)
                 continue;
 
+            // Include probes even if they're hidden by the focus system
             Vector3 probeCurrentPos = probe.transform.position;
             Vector3 probeOriginalPos = GetProbeOriginalPosition(probe);
             Vector3 probeDisplacement = probeCurrentPos - probeOriginalPos;
@@ -236,10 +235,10 @@ public class GridRebuildManager : MonoBehaviour
             int probeRow = probeGridIndex.y;
             int probeCol = probeGridIndex.x;
 
-            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, 2);  
-            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, 2);  
-            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, 2);     
-            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, 2); 
+            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, 1);
+            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, 1);
+            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, 1);
+            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, 1); 
 
             int minCol = Mathf.Max(1, probeCol - leftLimit);    
             int maxCol = Mathf.Min(gridSize - 1, probeCol + rightLimit); 
@@ -284,22 +283,22 @@ public class GridRebuildManager : MonoBehaviour
 
     private float GetDeformationWeight(int distance)
     {
-        if (distance == 0) return 1.0f;   
-        if (distance == 1) return 0.66f;  
-        if (distance == 2) return 0.33f;  
-        return 0f;                         
+        if (distance == 0) return 1.0f;   // At probe position: 100%
+        if (distance == 1) return 0.66f;  // 1 cell away: 66%
+        return 0f;                         // Beyond 1 cell: 0%
     }
 
     private bool IsProbeAtGridPoint(int row, int col, GameObject currentProbe)
     {
         foreach (GameObject probe in probeDots.probes)
         {
-            if (probe == null || !probe.activeInHierarchy)
+            if (probe == null)
                 continue;
 
             if (probe == currentProbe)
                 continue;
 
+            // Check probe positions even if they're hidden by focus system
             Vector2Int probeIndex = GetProbeGridIndex(probe);
             if (probeIndex.y == row && probeIndex.x == col)
                 return true;
@@ -335,24 +334,24 @@ public class GridRebuildManager : MonoBehaviour
                 }
             }
 
-            
+
             foreach (GameObject otherProbe in probeDots.probes)
             {
-                if (otherProbe == null || !otherProbe.activeInHierarchy)
+                if (otherProbe == null)
                     continue;
 
+                // Check probe positions even if they're hidden by focus system
                 Vector2Int otherProbeIndex = GetProbeGridIndex(otherProbe);
 
-                
+
                 if (otherProbeIndex.y == checkRow && otherProbeIndex.x == checkCol)
                 {
-                    
+
                     return Mathf.Max(0, dist - 1);
                 }
             }
         }
 
-       
         return maxDistance;
     }
 
@@ -394,7 +393,7 @@ public class GridRebuildManager : MonoBehaviour
         return new Vector2Int(col, row);
     }
 
-    private void UpdateHorizontalLines()
+    public void UpdateHorizontalLines()
     {
         int pointCount = gridSize + 1;
 
@@ -409,8 +408,7 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
-
-    private void UpdateVerticalLines()
+    public void UpdateVerticalLines()
     {
         int pointCount = gridSize + 1;
 
