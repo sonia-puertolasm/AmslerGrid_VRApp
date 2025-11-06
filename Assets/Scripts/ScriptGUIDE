@@ -41,14 +41,6 @@ Generate and manage the Amsler Grid system in Unity for visualization and intera
 - Set center fixation dot as non-interactive (!isInteractable)
 - Define center fixation dot as own species (isCenterFixation) and store reference
 
-**SetupCamera()**
-
-- Retrieving of the main camera after safety check of existance of main camera *(avoids null reference errors)*
-- Centering of the main camera on the grid in both x-plane and y-plane
-- Rotation of the main camera resetted to default
-- Definition of the main camera projection as orthographic *(avoids distortion-associated artifacts)*
-- Defines padding for the viewing of the grid with a "border"
-
 ### Logic behind the script: Helper functions
 
 **CreateLine()**
@@ -58,7 +50,15 @@ Generate and manage the Amsler Grid system in Unity for visualization and intera
 - Definition of start and end positions of the lines
 - Association of new line into GO
 
-**GridPointData**
+**SetupCamera()**
+
+- Retrieving of the main camera after safety check of existance of main camera *(avoids null reference errors)*
+- Centering of the main camera on the grid in both x-plane and y-plane
+- Rotation of the main camera resetted to default
+- Definition of the main camera projection as orthographic *(avoids distortion-associated artifacts)*
+- Defines padding for the viewing of the grid with a "border"
+
+**GridPointData (CLASS)**
 
 - Define row, col variables
 - Define isInteractable and isCenterFixation variables for identification of species
@@ -82,7 +82,7 @@ Track the displacement of probe objects in the given Amsler Grid system though c
 
 ### Logic behind the script: Main functions
 
-**InitializeTracker()**
+**InitializeTracker() (COROUTINE)**
 
 - Coroutine approach to initialize tracking after grid has been generated
 - Retrieval of GO elements from other scripts
@@ -148,53 +148,77 @@ Track the displacement of probe objects in the given Amsler Grid system though c
 
 - Overall reset of the displacement tracker system
 
-## Grid deformation system: GridDeformation.cs
+## Grid definition and creation: ProbeColors.cs
 
 ### Aim of the script
 
-According to the probe dot displacements, bends the Amsler Grid's line segments for ensuring that every horizontal/vertical line passes through the probe's current position through a x4 2-line continuous segments, with updated changes in the overall grid after confirmation during exit of the deformation mode.
+Define the colors for the probe dots in the different states that the probe dot travels through during functioning of the software
 
 ### Workflow of the script
 
-1. Definition of the grid configuration parameters and of parameters for grid lines organization
-2. Mapping of every probe dot to its corresponding grid line
-3. Definition of deformation-based and displacement-based parameters 
-4. Definition of elements and storage of 2-line continuous segments
-5. Initialization after Amsler Grid's spawn with mapping of each probe to the indices of its horizontal and vertical lines
-6. Reaction to probe movement -> collection of probes with displacement > threshold and bending of segments who span contains the probe's coordinates
-7. Guided deformation until the neighboring probe dots or the Amsler Grid's external boundaries
+1. Definition of core colors for probe dots and their initial status (default, selected, completed)
+
+2. Definition of higher-iteration colors for probe dots and their status (inactive~defaul)
+
+## Grid definition and creation: FocusSystems.cs
+
+### Aim of the script
+
+Implementing a dynamic focus mode that allows the user to concentrate on specific areas of the Amsler Grid during testing.
+
+### Workflow of the script
+
+1. Definition of the grid configuration parameters
+2. Definition of focus mode specific parameters
+3. Definition of dictionaries for visibility and positioning of the probe dots and line segments
+4. Definition of focus mode specific parameters when updated
+5. Declaration of the lines segments to be defined in focus mode
+6. Initialization of all grid-generation functions and safety check
+7. Callback update method and safety check 
+8. Definition of entering and exiting of focus mode functions
+9. Displaying of area of interest around the selected probe dot
+10. Creation of visual segment through portion-extraction of originally rendered lines
+11. Synchronization of focus mode line segments with original ones
+12. Restoring function for all lines in Amsler Grid
+13. Hiding of all non-selected probe dots
+14. Restoring of visibility of all probe dots in Amsler Grid
+15. Extraction of probe dot's Amsler Grid index
 
 ### Logic behind the script: Main functions
 
-**InitializeDeformation()**
+**EnterFocusMode(int probeIndex)**
 
-**LateUpdate()**
+- Definition of focus mode status variable isInFocusMode
+- Definition of selected probe dot index as currentFocusProbeIndex
+- Calling of probe hiding function HideAllProbesExcept(probeIndex)
+- Calling of focus area visualization function ShowFocusAreaAroundProbe(probeIndex)
 
-**OrganizeGridLines()**
+**ExitFocusMode()**
 
-**MapProbesToGridLines()**
+- Safety check to ensure grid status = focus mode
+- Re-definition of isInFocusMode to false
+- Re-definition of selected probe dot index to -1
+- Calling of RestoreAllLines() and RestoreProbeVisibility() for restoring of form and visualization of all Amsler Grid lines
 
-**UpdateGridDeformation()**
+**ShowFocusAreaAroundProbe(int probeIndex)**
 
-**UpdateHorizontalLine()/UpdateVerticalLine()**
+- Safety checks to ensure existance of elements for focus mode definition ensure valid probe dot search
+- Define selected probe index
+- Safety check to ensure there is a selected probe dot
 
-**EnterDisplacementMode()**
-
-**UpdateDisplacementLines()**
-
-**ExitDisplacementMode()**
-
-**BakeDeformationToSegments()**
-
-**BakeDeformationAlongDynamicPath()**
+**UpdateFocusModeSegments()**
 
 ### Logic behind the script: Helper functions
 
-#### Visibility and safety
+**CreateLineSegment(...)**
 
-#### Resetting
+**RestoreAllLines()**
 
-#### Displacement-line plumbing
+**HideAllProbesExcept(int selectedIndex)**
 
-#### Path and selection 
+**RestoreProbeVisibility()**
+
+**GetProbeGridIndex(GameObject probe)**
+
+
 

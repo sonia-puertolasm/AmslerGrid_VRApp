@@ -9,5 +9,4 @@ public static class ProbeColors
 
     // Iteration-specific colors
     public static readonly Color InactiveHigherIt = Color.blue;
-    public static readonly Color CenterHigherIt = Color.magenta;
 }

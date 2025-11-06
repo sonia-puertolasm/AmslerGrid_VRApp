@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class GridRebuildManager : MonoBehaviour
@@ -223,7 +224,6 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == null)
                 continue;
 
-            // Include probes even if they're hidden by the focus system
             Vector3 probeCurrentPos = probe.transform.position;
             Vector3 probeOriginalPos = GetProbeOriginalPosition(probe);
             Vector3 probeDisplacement = probeCurrentPos - probeOriginalPos;
@@ -283,9 +283,12 @@ public class GridRebuildManager : MonoBehaviour
 
     private float GetDeformationWeight(int distance)
     {
-        if (distance == 0) return 1.0f;   // At probe position: 100%
-        if (distance == 1) return 0.66f;  // 1 cell away: 66%
-        return 0f;                         // Beyond 1 cell: 0%
+        float maxDistance = 2.5f;
+        if (distance > maxDistance) return 0f;
+        
+        float normalized = distance / maxDistance;
+        float weight = 1.0f - (normalized * normalized);
+        return weight;
     }
 
     private bool IsProbeAtGridPoint(int row, int col, GameObject currentProbe)
@@ -298,7 +301,6 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == currentProbe)
                 continue;
 
-            // Check probe positions even if they're hidden by focus system
             Vector2Int probeIndex = GetProbeGridIndex(probe);
             if (probeIndex.y == row && probeIndex.x == col)
                 return true;
