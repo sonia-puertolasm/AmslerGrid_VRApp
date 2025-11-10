@@ -24,7 +24,7 @@ public class GridRebuildManager : MonoBehaviour
     private bool needsRebuild = false;
     private Vector3[] lastProbePositions;
 
-    private Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
+    public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
 
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
@@ -187,6 +187,10 @@ public class GridRebuildManager : MonoBehaviour
             if (probe.transform == null)
                 continue;
 
+            // Skip inactive probes (hidden by iteration system)
+            if (!probe.activeInHierarchy)
+                continue;
+
             // Track movement even for hidden probes (focus system)
             Vector3 currentPos = probe.transform.position;
             if (Vector3.Distance(currentPos, lastProbePositions[i]) > 0.001f)
@@ -222,6 +226,10 @@ public class GridRebuildManager : MonoBehaviour
         foreach (GameObject probe in probeDots.probes)
         {
             if (probe == null)
+                continue;
+
+            // Skip inactive probes (hidden by iteration system)
+            if (!probe.activeInHierarchy)
                 continue;
 
             Vector3 probeCurrentPos = probe.transform.position;
@@ -301,6 +309,10 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == currentProbe)
                 continue;
 
+            // Skip inactive probes (hidden by iteration system)
+            if (!probe.activeInHierarchy)
+                continue;
+
             Vector2Int probeIndex = GetProbeGridIndex(probe);
             if (probeIndex.y == row && probeIndex.x == col)
                 return true;
@@ -340,6 +352,10 @@ public class GridRebuildManager : MonoBehaviour
             foreach (GameObject otherProbe in probeDots.probes)
             {
                 if (otherProbe == null)
+                    continue;
+
+                // Skip inactive probes (hidden by iteration system)
+                if (!otherProbe.activeInHierarchy)
                     continue;
 
                 // Check probe positions even if they're hidden by focus system
@@ -443,5 +459,33 @@ public class GridRebuildManager : MonoBehaviour
         }
 
         needsRebuild = true;
+    }
+
+    public Vector2Int GetProbeGridCell(GameObject probe)
+    {
+        return GetProbeGridIndex(probe);
+    }
+
+    public Vector3 GetDeformedGridPoint(int row, int col)
+    {
+        if (currentGridPoints != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
+        {
+            return currentGridPoints[row, col];
+        }
+        return Vector3.zero;
+    }
+
+    public int GetGridSize()
+    {
+        return gridSize;
+    }
+
+    public Vector3 GetOriginalGridPoint(int row, int col)
+    {
+        if (originalGridPoints != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
+        {
+            return originalGridPoints[row, col];
+        }
+        return Vector3.zero;
     }
 }

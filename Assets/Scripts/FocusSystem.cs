@@ -21,9 +21,6 @@ public class FocusSystem : MonoBehaviour
     // Definition of dictionary for the visibility of the probes
     private Dictionary<GameObject, bool> originalProbeVisibility = new Dictionary<GameObject, bool>();
 
-    // Definition of dictionary for the positions of the probes
-    private Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
-
     // Definition of dictionary for the line segments to be shown while in focus mode
     private List<FocusLineSegment> focusModeLineSegments = new List<FocusLineSegment>();
     
@@ -70,17 +67,6 @@ public class FocusSystem : MonoBehaviour
             cellSize = mainGrid.CellSize;
             gridCenter = mainGrid.GridCenterPosition;
             halfWidth = mainGrid.TotalGridWidth / 2f;
-        }
-
-        if (probeDots != null && probeDots.probes != null) // Safety: ensures that the probe positions in the grid are obtained ONLY if there exist probe dots
-        {
-            foreach (GameObject probe in probeDots.probes)
-            {
-                if (probe != null)
-                {
-                    probeOriginalPositions[probe] = probe.transform.position;
-                }
-            }
         }
     }
 
@@ -335,32 +321,13 @@ public class FocusSystem : MonoBehaviour
         originalProbeVisibility.Clear(); // Resets dictionary
     }
 
-    // HELPER FUNCTION: Extracts the probe dot Amsler Grid index
+    // HELPER FUNCTION: Obtaining of the grid index of a specific probe dot
     private Vector2Int GetProbeGridIndex(GameObject probe)
     {
-        Vector3 probeOriginalPos;
-
-        if (probeOriginalPositions.ContainsKey(probe)) // Checks if the probe dot exists in the dictionary
+        if (gridRebuildManager == null) // Safety: exit in case of null deformation manager
         {
-            probeOriginalPos = probeOriginalPositions[probe];
+            return Vector2Int.zero;
         }
-        else
-        {
-            probeOriginalPos = probe.transform.position; // Defines the original position of the probe dot as a 3D vector
-        }
-
-        // Calculation of the grid origin in the bottom-left corner in x-y coordinates
-        float originX = gridCenter.x - halfWidth;
-        float originY = gridCenter.y - halfWidth;
-
-        // Calculation for rows, cols from location of the probe to index of the probe as: (Position-Origin)/cellSize
-        int col = Mathf.RoundToInt((probeOriginalPos.x - originX) / cellSize);
-        int row = Mathf.RoundToInt((probeOriginalPos.y - originY) / cellSize);
-
-        // Clamp to ensure that the calculated indices stay within valid grid boundaries
-        col = Mathf.Clamp(col, 0, gridSize);
-        row = Mathf.Clamp(row, 0, gridSize);
-
-        return new Vector2Int(col, row);
+        return gridRebuildManager.GetProbeGridCell(probe); // use the deformation manager to obtain the grid cell of the probe dot
     }
 }

@@ -1,0 +1,340 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class IterationManager : MonoBehaviour
+{
+    private ProbeDots probeDots;
+    private MainGrid mainGrid;
+    private GridRebuildManager gridRebuildManager;
+    private DisplacementTracker displacementTracker;
+    private FocusSystem focusSystem;
+
+    private int currentIteration = 1;
+    private const int maxIterations = 2;
+
+    private Dictionary<int, List<GameObject>> iterationProbes = new Dictionary<int, List<GameObject>>();
+    private Dictionary<int, GameObject> iterationFixationPoints = new Dictionary<int, GameObject>();
+
+    private GameObject iteration2FixationPoint;
+    private List<GameObject> iteration2Probes = new List<GameObject>();
+    private Dictionary<GameObject, Vector3> iteration2InitialPositions = new Dictionary<GameObject, Vector3>();
+
+    private float spacingScaleFactor = 0.5f;
+
+    private int gridSize;
+    private float cellSize;
+    private Vector3 gridCenter;
+    private float halfWidth;
+
+    void Start()
+    {
+        probeDots = FindObjectOfType<ProbeDots>();
+        mainGrid = FindObjectOfType<MainGrid>();
+        gridRebuildManager = FindObjectOfType<GridRebuildManager>();
+        displacementTracker = FindObjectOfType<DisplacementTracker>();
+        focusSystem = FindObjectOfType<FocusSystem>();
+
+        if (mainGrid != null)
+        {
+            gridSize = mainGrid.GridSize;
+            cellSize = mainGrid.CellSize;
+            gridCenter = mainGrid.GridCenterPosition;
+            halfWidth = mainGrid.TotalGridWidth / 2f;
+        }
+
+        StartCoroutine(InitializeIterationSystem());
+    }
+
+    private IEnumerator InitializeIterationSystem()
+    {
+        // Wait for probes to be fully initialized
+        yield return new WaitForSeconds(0.2f);
+
+        if (probeDots != null && probeDots.probes != null && probeDots.probes.Count > 0)
+        {
+            iterationProbes[1] = new List<GameObject>(probeDots.probes);
+
+            GameObject centerFixation = GameObject.Find("CenterFixationPoint");
+            if (centerFixation != null)
+            {
+                iterationFixationPoints[1] = centerFixation;
+            }
+        }
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            HandleEnterKey();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            HandleEscapeKey();
+        }
+    }
+
+    private void HandleEnterKey()
+    {
+        if (currentIteration == 1 && probeDots != null && probeDots.selectedProbeIndex >= 0)
+        {
+            AdvanceToIteration2();
+        }
+    }
+
+    private void HandleEscapeKey()
+    {
+        if (currentIteration == 2)
+        {
+            ReturnToIteration1();
+        }
+    }
+
+    private void AdvanceToIteration2()
+    {
+        if (probeDots.selectedProbeIndex < 0 || probeDots.selectedProbeIndex >= probeDots.probes.Count)
+        {
+            return;
+        }
+
+        GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+        if (selectedProbe == null)
+        {
+            return;
+        }
+
+        Vector3 newCenterPosition = selectedProbe.transform.position;
+
+        HideIteration1Probes();
+
+        if (focusSystem != null && focusSystem.focusSystemEnabled)
+        {
+            focusSystem.ExitFocusMode();
+        }
+
+        CreateIteration2FixationPoint(newCenterPosition);
+
+        SpawnIteration2Probes(newCenterPosition);
+
+        currentIteration = 2;
+
+        probeDots.selectedProbeIndex = -1;
+
+        if (gridRebuildManager != null)
+        {
+            gridRebuildManager.ForceRebuild();
+        }
+    }
+
+    private void CreateIteration2FixationPoint(Vector3 position)
+    {
+        iteration2FixationPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        iteration2FixationPoint.name = "CenterFixationPoint_Iteration2";
+        iteration2FixationPoint.transform.position = position;
+        iteration2FixationPoint.transform.localScale = Vector3.one * probeDots.probeDotSize; 
+
+        Renderer renderer = iteration2FixationPoint.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material.color = ProbeColors.Default; 
+        }
+
+        GridPointData pointData = iteration2FixationPoint.AddComponent<GridPointData>();
+        pointData.isInteractable = false;
+        pointData.isCenterFixation = true;
+
+        iterationFixationPoints[2] = iteration2FixationPoint;
+    }
+
+    private void SpawnIteration2Probes(Vector3 centerPosition)
+    {
+        iteration2Probes.Clear();
+        iteration2InitialPositions.Clear();
+
+        float originalSpacing = probeDots.probeSpacing;
+        float newSpacing = originalSpacing * spacingScaleFactor;
+
+        Vector3[] relativePositions = new Vector3[]
+        {
+            new Vector3(-newSpacing, -newSpacing, 0),  // Bottom-left
+            new Vector3(0, -newSpacing, 0),            // Bottom-center
+            new Vector3(newSpacing, -newSpacing, 0),   // Bottom-right
+            new Vector3(-newSpacing, 0, 0),            // Middle-left
+            new Vector3(newSpacing, 0, 0),             // Middle-right
+            new Vector3(-newSpacing, newSpacing, 0),   // Top-left
+            new Vector3(0, newSpacing, 0),             // Top-center
+            new Vector3(newSpacing, newSpacing, 0)     // Top-right
+        };
+
+        for (int i = 0; i < relativePositions.Length; i++)
+        {
+            Vector3 targetPosition = centerPosition + relativePositions[i];
+
+            Vector3 snappedPosition = SnapToNearestGridPoint(targetPosition);
+
+            GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            probe.name = $"ProbePoint_Iteration2_{i}";
+            probe.transform.position = snappedPosition;
+            probe.transform.localScale = Vector3.one * probeDots.probeDotSize;
+            probe.transform.SetParent(transform);
+
+            Renderer renderer = probe.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = true;
+                renderer.material.color = ProbeColors.Default;
+            }
+
+            GridPointData pointData = probe.AddComponent<GridPointData>();
+            pointData.isInteractable = true;
+
+            iteration2InitialPositions[probe] = snappedPosition;
+
+            iteration2Probes.Add(probe);
+
+            if (gridRebuildManager != null)
+            {
+                gridRebuildManager.probeOriginalPositions[probe] = snappedPosition;
+            }
+        }
+
+        probeDots.probes = new List<GameObject>(iteration2Probes);
+        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(iteration2InitialPositions);
+        probeDots.selectedProbeIndex = -1;
+
+        iterationProbes[2] = new List<GameObject>(iteration2Probes);
+    }
+
+    private Vector3 SnapToNearestGridPoint(Vector3 targetPosition)
+    {
+        if (gridRebuildManager == null)
+            return targetPosition;
+
+        int gridSize = gridRebuildManager.GetGridSize();
+        float minDistance = float.MaxValue;
+        Vector3 closestPoint = targetPosition;
+
+        for (int row = 0; row <= gridSize; row++)
+        {
+            for (int col = 0; col <= gridSize; col++)
+            {
+                Vector3 gridPoint = gridRebuildManager.GetDeformedGridPoint(row, col);
+
+                gridPoint.z = targetPosition.z;
+
+                float distance = Vector3.Distance(targetPosition, gridPoint);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestPoint = gridPoint;
+                }
+            }
+        }
+
+        return closestPoint;
+    }
+
+    private void HideIteration1Probes()
+    {
+        if (iterationProbes.ContainsKey(1))
+        {
+            foreach (GameObject probe in iterationProbes[1])
+            {
+                if (probe != null)
+                {
+                    Renderer renderer = probe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        renderer.enabled = false;
+                    }
+
+                    probe.SetActive(false);
+                }
+            }
+        }
+
+        if (iterationFixationPoints.ContainsKey(1))
+        {
+            GameObject fixation = iterationFixationPoints[1];
+            if (fixation != null)
+            {
+
+                Renderer renderer = fixation.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = false;
+                }
+
+                fixation.SetActive(false);
+            }
+        }
+    }
+
+    private void ReturnToIteration1()
+    {
+        foreach (GameObject probe in iteration2Probes)
+        {
+            if (probe != null)
+            {
+                Destroy(probe);
+            }
+        }
+        iteration2Probes.Clear();
+        iteration2InitialPositions.Clear();
+
+        if (iteration2FixationPoint != null)
+        {
+            Destroy(iteration2FixationPoint);
+            iteration2FixationPoint = null;
+        }
+
+        if (iterationProbes.ContainsKey(1))
+        {
+            foreach (GameObject probe in iterationProbes[1])
+            {
+                if (probe != null)
+                {
+                    probe.SetActive(true);
+                }
+            }
+        }
+
+        if (iterationFixationPoints.ContainsKey(1))
+        {
+            GameObject fixation = iterationFixationPoints[1];
+            if (fixation != null)
+            {
+                fixation.SetActive(true);
+            }
+        }
+
+        probeDots.probes = new List<GameObject>(iterationProbes[1]);
+        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>();
+
+        foreach (GameObject probe in iterationProbes[1])
+        {
+            if (probe != null && gridRebuildManager != null)
+            {
+                if (gridRebuildManager.probeOriginalPositions.ContainsKey(probe))
+                {
+                    probeDots.probeInitialPositions[probe] = gridRebuildManager.probeOriginalPositions[probe];
+                }
+            }
+        }
+
+        probeDots.selectedProbeIndex = -1;
+
+        currentIteration = 1;
+
+        if (gridRebuildManager != null)
+        {
+            gridRebuildManager.ForceRebuild();
+        }
+    }
+
+    public int CurrentIteration => currentIteration;
+    public bool IsInIteration2 => currentIteration == 2;
+}
