@@ -26,6 +26,9 @@ public class GridRebuildManager : MonoBehaviour
 
     public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
 
+    // Track all probes across all iterations for accumulative deformation
+    private List<GameObject> allProbes = new List<GameObject>();
+
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
 
@@ -71,7 +74,7 @@ public class GridRebuildManager : MonoBehaviour
             GameObject probe = probeDots.probes[i];
             Vector3 originalPos = probe.transform.position;
             lastProbePositions[i] = originalPos;
-            probeOriginalPositions[probe] = originalPos;
+            RegisterProbe(probe, originalPos);
         }
 
         needsRebuild = true;
@@ -160,15 +163,15 @@ public class GridRebuildManager : MonoBehaviour
 
     private bool CheckProbesMoved()
     {
-        if (lastProbePositions == null || probeDots == null || probeDots.probes == null)
+        if (allProbes == null || allProbes.Count == 0)
             return false;
 
-        if (lastProbePositions.Length != probeDots.probes.Count)
+        if (lastProbePositions == null || lastProbePositions.Length != allProbes.Count)
         {
-            lastProbePositions = new Vector3[probeDots.probes.Count];
-            for (int i = 0; i < probeDots.probes.Count; i++)
+            lastProbePositions = new Vector3[allProbes.Count];
+            for (int i = 0; i < allProbes.Count; i++)
             {
-                GameObject probe = probeDots.probes[i];
+                GameObject probe = allProbes[i];
                 if (probe != null && probe.transform != null)
                 {
                     lastProbePositions[i] = probe.transform.position;
@@ -177,9 +180,9 @@ public class GridRebuildManager : MonoBehaviour
             return false;
         }
 
-        for (int i = 0; i < probeDots.probes.Count; i++)
+        for (int i = 0; i < allProbes.Count; i++)
         {
-            GameObject probe = probeDots.probes[i];
+            GameObject probe = allProbes[i];
 
             if (probe == null)
                 continue;
@@ -187,11 +190,7 @@ public class GridRebuildManager : MonoBehaviour
             if (probe.transform == null)
                 continue;
 
-            // Skip inactive probes (hidden by iteration system)
-            if (!probe.activeInHierarchy)
-                continue;
-
-            // Track movement even for hidden probes (focus system)
+            // Track movement of all probes (active or inactive) to maintain accumulative deformation
             Vector3 currentPos = probe.transform.position;
             if (Vector3.Distance(currentPos, lastProbePositions[i]) > 0.001f)
             {
@@ -215,6 +214,7 @@ public class GridRebuildManager : MonoBehaviour
     {
         int pointCount = gridSize + 1;
 
+        // Reset all grid points to their original positions
         for (int row = 0; row < pointCount; row++)
         {
             for (int col = 0; col < pointCount; col++)
@@ -223,15 +223,14 @@ public class GridRebuildManager : MonoBehaviour
             }
         }
 
-        foreach (GameObject probe in probeDots.probes)
+        // Apply deformations from ALL registered probes (across all iterations)
+        // This ensures accumulative deformation even when switching iterations
+        foreach (GameObject probe in allProbes)
         {
             if (probe == null)
                 continue;
 
-            // Skip inactive probes (hidden by iteration system)
-            if (!probe.activeInHierarchy)
-                continue;
-
+            // Calculate displacement for all registered probes (active or inactive)
             Vector3 probeCurrentPos = probe.transform.position;
             Vector3 probeOriginalPos = GetProbeOriginalPosition(probe);
             Vector3 probeDisplacement = probeCurrentPos - probeOriginalPos;
@@ -246,12 +245,12 @@ public class GridRebuildManager : MonoBehaviour
             int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, 1);
             int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, 1);
             int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, 1);
-            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, 1); 
+            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, 1);
 
-            int minCol = Mathf.Max(1, probeCol - leftLimit);    
-            int maxCol = Mathf.Min(gridSize - 1, probeCol + rightLimit); 
-            int minRow = Mathf.Max(1, probeRow - downLimit);    
-            int maxRow = Mathf.Min(gridSize - 1, probeRow + upLimit);   
+            int minCol = Mathf.Max(1, probeCol - leftLimit);
+            int maxCol = Mathf.Min(gridSize - 1, probeCol + rightLimit);
+            int minRow = Mathf.Max(1, probeRow - downLimit);
+            int maxRow = Mathf.Min(gridSize - 1, probeRow + upLimit);
 
             for (int row = minRow; row <= maxRow; row++)
             {
@@ -280,7 +279,7 @@ public class GridRebuildManager : MonoBehaviour
                     {
                         rowWeight = GetDeformationWeight(deltaRow);
                         colWeight = GetDeformationWeight(deltaCol);
-                        weight = weight * 0.7f; // 
+                        weight = weight * 0.7f; //
                     }
 
                     currentGridPoints[row, col] += probeDisplacement * weight * rowWeight * colWeight;
@@ -301,7 +300,7 @@ public class GridRebuildManager : MonoBehaviour
 
     private bool IsProbeAtGridPoint(int row, int col, GameObject currentProbe)
     {
-        foreach (GameObject probe in probeDots.probes)
+        foreach (GameObject probe in allProbes)
         {
             if (probe == null)
                 continue;
@@ -309,10 +308,7 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == currentProbe)
                 continue;
 
-            // Skip inactive probes (hidden by iteration system)
-            if (!probe.activeInHierarchy)
-                continue;
-
+            // Check all probes (active or inactive) to prevent deformation at probe positions
             Vector2Int probeIndex = GetProbeGridIndex(probe);
             if (probeIndex.y == row && probeIndex.x == col)
                 return true;
@@ -349,22 +345,16 @@ public class GridRebuildManager : MonoBehaviour
             }
 
 
-            foreach (GameObject otherProbe in probeDots.probes)
+            foreach (GameObject otherProbe in allProbes)
             {
                 if (otherProbe == null)
                     continue;
 
-                // Skip inactive probes (hidden by iteration system)
-                if (!otherProbe.activeInHierarchy)
-                    continue;
-
-                // Check probe positions even if they're hidden by focus system
+                // Check all registered probes (active or inactive)
                 Vector2Int otherProbeIndex = GetProbeGridIndex(otherProbe);
-
 
                 if (otherProbeIndex.y == checkRow && otherProbeIndex.x == checkCol)
                 {
-
                     return Mathf.Max(0, dist - 1);
                 }
             }
@@ -487,5 +477,25 @@ public class GridRebuildManager : MonoBehaviour
             return originalGridPoints[row, col];
         }
         return Vector3.zero;
+    }
+
+    // Register a probe to be tracked for accumulative deformation
+    public void RegisterProbe(GameObject probe, Vector3 originalPosition)
+    {
+        if (probe != null && !allProbes.Contains(probe))
+        {
+            allProbes.Add(probe);
+            probeOriginalPositions[probe] = originalPosition;
+        }
+    }
+
+    // Unregister a probe (e.g., when switching iterations)
+    public void UnregisterProbe(GameObject probe)
+    {
+        if (probe != null)
+        {
+            allProbes.Remove(probe);
+            probeOriginalPositions.Remove(probe);
+        }
     }
 }

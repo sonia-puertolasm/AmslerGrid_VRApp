@@ -16,7 +16,7 @@ public class IterationManager : MonoBehaviour
     private Dictionary<int, List<GameObject>> iterationProbes = new Dictionary<int, List<GameObject>>();
     private Dictionary<int, GameObject> iterationFixationPoints = new Dictionary<int, GameObject>();
 
-    private GameObject iteration2FixationPoint;
+    private GameObject iteration2CenterFixationPoint;
     private List<GameObject> iteration2Probes = new List<GameObject>();
     private Dictionary<GameObject, Vector3> iteration2InitialPositions = new Dictionary<GameObject, Vector3>();
 
@@ -70,9 +70,9 @@ public class IterationManager : MonoBehaviour
             HandleEnterKey();
         }
 
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(KeyCode.Backspace))
         {
-            HandleEscapeKey();
+            HandleBackspaceKey();
         }
     }
 
@@ -84,9 +84,10 @@ public class IterationManager : MonoBehaviour
         }
     }
 
-    private void HandleEscapeKey()
+    private void HandleBackspaceKey()
     {
-        if (currentIteration == 2)
+        // Only allow going back if in iteration 2 AND no probe is currently selected (probe-selection mode)
+        if (currentIteration == 2 && probeDots != null && probeDots.selectedProbeIndex == -1)
         {
             ReturnToIteration1();
         }
@@ -114,7 +115,7 @@ public class IterationManager : MonoBehaviour
             focusSystem.ExitFocusMode();
         }
 
-        CreateIteration2FixationPoint(newCenterPosition);
+        CreateIteration2CenterFixationPoint();
 
         SpawnIteration2Probes(newCenterPosition);
 
@@ -128,24 +129,50 @@ public class IterationManager : MonoBehaviour
         }
     }
 
-    private void CreateIteration2FixationPoint(Vector3 position)
+    private void CreateIteration2CenterFixationPoint()
     {
-        iteration2FixationPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        iteration2FixationPoint.name = "CenterFixationPoint_Iteration2";
-        iteration2FixationPoint.transform.position = position;
-        iteration2FixationPoint.transform.localScale = Vector3.one * probeDots.probeDotSize; 
+        // Get the original iteration 1 center fixation point to match its properties
+        GameObject iteration1Center = iterationFixationPoints.ContainsKey(1) ? iterationFixationPoints[1] : null;
 
-        Renderer renderer = iteration2FixationPoint.GetComponent<Renderer>();
-        if (renderer != null)
+        if (iteration1Center == null)
         {
-            renderer.material.color = ProbeColors.Default; 
+            iteration1Center = GameObject.Find("CenterFixationPoint");
         }
 
-        GridPointData pointData = iteration2FixationPoint.AddComponent<GridPointData>();
+        // Create the center fixation point for iteration 2 at the grid center
+        iteration2CenterFixationPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        iteration2CenterFixationPoint.name = "CenterFixationPoint_Iteration2";
+        iteration2CenterFixationPoint.transform.position = gridCenter;
+
+        // Match the size and appearance of iteration 1's center fixation point
+        if (iteration1Center != null)
+        {
+            iteration2CenterFixationPoint.transform.localScale = iteration1Center.transform.localScale;
+
+            Renderer originalRenderer = iteration1Center.GetComponent<Renderer>();
+            Renderer newRenderer = iteration2CenterFixationPoint.GetComponent<Renderer>();
+            if (originalRenderer != null && newRenderer != null)
+            {
+                newRenderer.material.color = originalRenderer.material.color;
+            }
+        }
+        else
+        {
+            // Fallback to default sizing
+            iteration2CenterFixationPoint.transform.localScale = Vector3.one * probeDots.probeDotSize;
+
+            Renderer renderer = iteration2CenterFixationPoint.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material.color = ProbeColors.Default;
+            }
+        }
+
+        GridPointData pointData = iteration2CenterFixationPoint.AddComponent<GridPointData>();
         pointData.isInteractable = false;
         pointData.isCenterFixation = true;
 
-        iterationFixationPoints[2] = iteration2FixationPoint;
+        iterationFixationPoints[2] = iteration2CenterFixationPoint;
     }
 
     private void SpawnIteration2Probes(Vector3 centerPosition)
@@ -196,7 +223,7 @@ public class IterationManager : MonoBehaviour
 
             if (gridRebuildManager != null)
             {
-                gridRebuildManager.probeOriginalPositions[probe] = snappedPosition;
+                gridRebuildManager.RegisterProbe(probe, snappedPosition);
             }
         }
 
@@ -220,7 +247,9 @@ public class IterationManager : MonoBehaviour
         {
             for (int col = 0; col <= gridSize; col++)
             {
-                Vector3 gridPoint = gridRebuildManager.GetDeformedGridPoint(row, col);
+                // Use ORIGINAL grid points instead of deformed points
+                // This ensures iteration 2+ probes snap to the undeformed grid structure
+                Vector3 gridPoint = gridRebuildManager.GetOriginalGridPoint(row, col);
 
                 gridPoint.z = targetPosition.z;
 
@@ -279,16 +308,20 @@ public class IterationManager : MonoBehaviour
         {
             if (probe != null)
             {
+                if (gridRebuildManager != null)
+                {
+                    gridRebuildManager.UnregisterProbe(probe);
+                }
                 Destroy(probe);
             }
         }
         iteration2Probes.Clear();
         iteration2InitialPositions.Clear();
 
-        if (iteration2FixationPoint != null)
+        if (iteration2CenterFixationPoint != null)
         {
-            Destroy(iteration2FixationPoint);
-            iteration2FixationPoint = null;
+            Destroy(iteration2CenterFixationPoint);
+            iteration2CenterFixationPoint = null;
         }
 
         if (iterationProbes.ContainsKey(1))

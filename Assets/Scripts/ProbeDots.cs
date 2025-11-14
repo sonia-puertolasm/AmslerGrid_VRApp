@@ -293,25 +293,6 @@ public class ProbeDots : MonoBehaviour
                 }
             }
         }
-
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            // Deselect all probes
-            if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
-            {
-                // Reset movement state
-                isMoving = false;
-
-                probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed;
-            }
-            selectedProbeIndex = -1;
-
-            // Exit focus mode
-            if (focusSystem != null)
-            {
-                focusSystem.ExitFocusMode();
-            }
-        }
     }
 
     // FUNCTION: Identify which probes are neighbors of each other based on their grid layout
@@ -326,8 +307,6 @@ public class ProbeDots : MonoBehaviour
         probeNeighbors.Clear();
 
         // Define neighbor relationships based on adjacency and close diagonals
-        // Only including probes within reasonable distance (≤5.0 units)
-        // Cell size = 1.25, so: adjacent = 2.5u, diagonal(√2 cells) = 3.5u, 2 cells away = 5.0u
 
         probeNeighbors[0] = new List<int> { 1, 2, 3, 5 };           // Bottom-left: right(2.5), far-right(5.0), up(2.5), far-up(5.0)
         probeNeighbors[1] = new List<int> { 0, 2, 3, 4, 6 };        // Bottom-center: left(2.5), right(2.5), diag-up-left(3.5), diag-up-right(3.5), far-up(5.0)
@@ -340,7 +319,6 @@ public class ProbeDots : MonoBehaviour
     }
 
     // FUNCTION: Get the CURRENT world positions of all neighbors for a given probe
-    // Uses current positions to prevent overlapping with displaced neighbors
     private List<Vector3> GetNeighborPositions(int probeIndex)
     {
         List<Vector3> neighborPositions = new List<Vector3>();
