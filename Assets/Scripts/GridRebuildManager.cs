@@ -28,6 +28,8 @@ public class GridRebuildManager : MonoBehaviour
 
     // Track all probes across all iterations for accumulative deformation
     private List<GameObject> allProbes = new List<GameObject>();
+    
+    private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
 
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
@@ -242,10 +244,17 @@ public class GridRebuildManager : MonoBehaviour
             int probeRow = probeGridIndex.y;
             int probeCol = probeGridIndex.x;
 
-            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, 1);
-            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, 1);
-            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, 1);
-            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, 1);
+            // Get the influence radius for this specific probe based on its iteration level
+            int maxInfluenceRadius = 2; // default to iteration 1
+            if (probeInfluenceRadius.ContainsKey(probe))
+            {
+                maxInfluenceRadius = probeInfluenceRadius[probe];
+            }
+
+            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, maxInfluenceRadius);
+            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, maxInfluenceRadius);
+            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, maxInfluenceRadius);
+            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, maxInfluenceRadius);
 
             int minCol = Mathf.Max(1, probeCol - leftLimit);
             int maxCol = Mathf.Min(gridSize - 1, probeCol + rightLimit);
@@ -480,12 +489,15 @@ public class GridRebuildManager : MonoBehaviour
     }
 
     // Register a probe to be tracked for accumulative deformation
-    public void RegisterProbe(GameObject probe, Vector3 originalPosition)
+    public void RegisterProbe(GameObject probe, Vector3 originalPosition, int iterationLevel = 1)
     {
         if (probe != null && !allProbes.Contains(probe))
         {
             allProbes.Add(probe);
             probeOriginalPositions[probe] = originalPosition;
+            
+            int influenceRadius = (iterationLevel == 1) ? 2 : 1;
+            probeInfluenceRadius[probe] = influenceRadius;
         }
     }
 
@@ -496,6 +508,7 @@ public class GridRebuildManager : MonoBehaviour
         {
             allProbes.Remove(probe);
             probeOriginalPositions.Remove(probe);
+            probeInfluenceRadius.Remove(probe);
         }
     }
 }

@@ -223,7 +223,7 @@ public class IterationManager : MonoBehaviour
 
             if (gridRebuildManager != null)
             {
-                gridRebuildManager.RegisterProbe(probe, snappedPosition);
+                gridRebuildManager.RegisterProbe(probe, snappedPosition, 2);
             }
         }
 
@@ -331,6 +331,11 @@ public class IterationManager : MonoBehaviour
                 if (probe != null)
                 {
                     probe.SetActive(true);
+                    Renderer renderer = probe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        renderer.enabled = true;
+                    }
                 }
             }
         }
@@ -341,6 +346,11 @@ public class IterationManager : MonoBehaviour
             if (fixation != null)
             {
                 fixation.SetActive(true);
+                Renderer renderer = fixation.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                }
             }
         }
 
