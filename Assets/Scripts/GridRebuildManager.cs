@@ -26,7 +26,6 @@ public class GridRebuildManager : MonoBehaviour
 
     public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
 
-    // Track all probes across all iterations for accumulative deformation
     private List<GameObject> allProbes = new List<GameObject>();
     
     private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
@@ -192,7 +191,6 @@ public class GridRebuildManager : MonoBehaviour
             if (probe.transform == null)
                 continue;
 
-            // Track movement of all probes (active or inactive) to maintain accumulative deformation
             Vector3 currentPos = probe.transform.position;
             if (Vector3.Distance(currentPos, lastProbePositions[i]) > 0.001f)
             {
@@ -216,7 +214,6 @@ public class GridRebuildManager : MonoBehaviour
     {
         int pointCount = gridSize + 1;
 
-        // Reset all grid points to their original positions
         for (int row = 0; row < pointCount; row++)
         {
             for (int col = 0; col < pointCount; col++)
@@ -225,14 +222,11 @@ public class GridRebuildManager : MonoBehaviour
             }
         }
 
-        // Apply deformations from ALL registered probes (across all iterations)
-        // This ensures accumulative deformation even when switching iterations
         foreach (GameObject probe in allProbes)
         {
             if (probe == null)
                 continue;
 
-            // Calculate displacement for all registered probes (active or inactive)
             Vector3 probeCurrentPos = probe.transform.position;
             Vector3 probeOriginalPos = GetProbeOriginalPosition(probe);
             Vector3 probeDisplacement = probeCurrentPos - probeOriginalPos;
@@ -244,22 +238,21 @@ public class GridRebuildManager : MonoBehaviour
             int probeRow = probeGridIndex.y;
             int probeCol = probeGridIndex.x;
 
-            // Get the influence radius for this specific probe based on its iteration level
-            int maxInfluenceRadius = 2; // default to iteration 1
+            int maxInfluenceRadius = 2;
             if (probeInfluenceRadius.ContainsKey(probe))
             {
                 maxInfluenceRadius = probeInfluenceRadius[probe];
             }
 
-            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, maxInfluenceRadius);
-            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, maxInfluenceRadius);
-            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, maxInfluenceRadius);
-            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, maxInfluenceRadius);
+            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, maxInfluenceRadius, probe);
+            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, maxInfluenceRadius, probe);
+            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, maxInfluenceRadius, probe);
+            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, maxInfluenceRadius, probe);
 
-            int minCol = Mathf.Max(1, probeCol - leftLimit);
-            int maxCol = Mathf.Min(gridSize - 1, probeCol + rightLimit);
-            int minRow = Mathf.Max(1, probeRow - downLimit);
-            int maxRow = Mathf.Min(gridSize - 1, probeRow + upLimit);
+            int minCol = Mathf.Max(0, probeCol - leftLimit);
+            int maxCol = Mathf.Min(gridSize, probeCol + rightLimit);
+            int minRow = Mathf.Max(0, probeRow - downLimit);
+            int maxRow = Mathf.Min(gridSize, probeRow + upLimit);
 
             for (int row = minRow; row <= maxRow; row++)
             {
@@ -268,42 +261,54 @@ public class GridRebuildManager : MonoBehaviour
                     if (row == 0 || row == gridSize || col == 0 || col == gridSize)
                         continue;
 
-                    int deltaRow = Mathf.Abs(row - probeRow);
-                    int deltaCol = Mathf.Abs(col - probeCol);
-
-                    int distance = Mathf.Max(deltaRow, deltaCol);
-
                     if (IsProbeAtGridPoint(row, col, probe))
                         continue;
 
                     if (IsCenterFixationAtGridPoint(row, col))
                         continue;
 
-                    float weight = GetDeformationWeight(distance);
+                    int deltaRow = row - probeRow;
+                    int deltaCol = col - probeCol;
 
-                    float rowWeight = 1.0f;
-                    float colWeight = 1.0f;
+                    float colWeight = CalculateAdaptiveWeight(deltaCol, -leftLimit, rightLimit);
+                    float rowWeight = CalculateAdaptiveWeight(deltaRow, -downLimit, upLimit);
 
-                    if (deltaRow > 0 && deltaCol > 0)
-                    {
-                        rowWeight = GetDeformationWeight(deltaRow);
-                        colWeight = GetDeformationWeight(deltaCol);
-                        weight = weight * 0.7f; //
-                    }
+                    float combinedWeight = colWeight * rowWeight;
 
-                    currentGridPoints[row, col] += probeDisplacement * weight * rowWeight * colWeight;
+                    currentGridPoints[row, col] += probeDisplacement * combinedWeight;
                 }
             }
         }
     }
 
-    private float GetDeformationWeight(int distance)
+    private float CalculateAdaptiveWeight(int delta, int negativeLimit, int positiveLimit)
     {
-        float maxDistance = 2.5f;
-        if (distance > maxDistance) return 0f;
-        
-        float normalized = distance / maxDistance;
-        float weight = 1.0f - (normalized * normalized);
+        if (delta == 0)
+            return 1.0f;
+
+        float maxDist;
+        float currentDist = Mathf.Abs(delta);
+
+        if (delta < 0)
+        {
+            maxDist = Mathf.Abs(negativeLimit);
+        }
+        else
+        {
+            maxDist = Mathf.Abs(positiveLimit);
+        }
+
+        if (maxDist < 0.001f)
+            return 0.0f;
+
+        float normalized = currentDist / maxDist;
+
+        if (normalized > 1.0f)
+            return 0.0f;
+
+        float t = normalized;
+        float weight = 1.0f - (t * t * (3.0f - 2.0f * t));
+
         return weight;
     }
 
@@ -317,7 +322,6 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == currentProbe)
                 continue;
 
-            // Check all probes (active or inactive) to prevent deformation at probe positions
             Vector2Int probeIndex = GetProbeGridIndex(probe);
             if (probeIndex.y == row && probeIndex.x == col)
                 return true;
@@ -334,42 +338,65 @@ public class GridRebuildManager : MonoBehaviour
         return (centerIndex.y == row && centerIndex.x == col);
     }
 
-    private int FindNearestProbeInDirection(int startRow, int startCol, int rowDir, int colDir, int maxDistance)
+    private int FindNearestProbeInDirection(int startRow, int startCol, int rowDir, int colDir, int maxDistance, GameObject currentProbe)
     {
+        int currentProbeIteration = GetProbeIteration(currentProbe);
         
         for (int dist = 1; dist <= maxDistance; dist++)
         {
             int checkRow = startRow + (rowDir * dist);
             int checkCol = startCol + (colDir * dist);
 
-           
+            if (checkRow < 0 || checkRow > gridSize || checkCol < 0 || checkCol > gridSize)
+            {
+                return dist;
+            }
+
             if (centerFixationPoint != null && centerFixationPoint.activeInHierarchy)
             {
                 Vector2Int centerIndex = GetProbeGridIndex(centerFixationPoint);
                 if (centerIndex.y == checkRow && centerIndex.x == checkCol)
                 {
-                    
-                    return Mathf.Max(0, dist - 1);
+                    return dist;
                 }
             }
-
 
             foreach (GameObject otherProbe in allProbes)
             {
                 if (otherProbe == null)
                     continue;
 
-                // Check all registered probes (active or inactive)
+                if (otherProbe == currentProbe)
+                    continue;
+
+                int otherProbeIteration = GetProbeIteration(otherProbe);
+                if (otherProbeIteration > currentProbeIteration)
+                    continue;
+
                 Vector2Int otherProbeIndex = GetProbeGridIndex(otherProbe);
 
                 if (otherProbeIndex.y == checkRow && otherProbeIndex.x == checkCol)
                 {
-                    return Mathf.Max(0, dist - 1);
+                    return dist;
                 }
             }
         }
 
         return maxDistance;
+    }
+
+    private int GetProbeIteration(GameObject probe)
+    {
+        if (probe == null)
+            return 1;
+
+        if (probeInfluenceRadius.ContainsKey(probe))
+        {
+            int radius = probeInfluenceRadius[probe];
+            return (radius == 2) ? 1 : 2;
+        }
+
+        return 1;
     }
 
     private Vector3 GetProbeOriginalPosition(GameObject probe)
@@ -488,7 +515,6 @@ public class GridRebuildManager : MonoBehaviour
         return Vector3.zero;
     }
 
-    // Register a probe to be tracked for accumulative deformation
     public void RegisterProbe(GameObject probe, Vector3 originalPosition, int iterationLevel = 1)
     {
         if (probe != null && !allProbes.Contains(probe))
@@ -501,7 +527,6 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
-    // Unregister a probe (e.g., when switching iterations)
     public void UnregisterProbe(GameObject probe)
     {
         if (probe != null)
@@ -510,5 +535,14 @@ public class GridRebuildManager : MonoBehaviour
             probeOriginalPositions.Remove(probe);
             probeInfluenceRadius.Remove(probe);
         }
+    }
+
+    public int GetProbeInfluenceRadius(GameObject probe)
+    {
+        if (probe != null && probeInfluenceRadius.ContainsKey(probe))
+        {
+            return probeInfluenceRadius[probe];
+        }
+        return 2;
     }
 }

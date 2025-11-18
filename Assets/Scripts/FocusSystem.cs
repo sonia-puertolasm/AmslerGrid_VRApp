@@ -16,7 +16,7 @@ public class FocusSystem : MonoBehaviour
     // Definition of focus mode specific parameters
     private bool isInFocusMode = false;
     public bool focusSystemEnabled = false;
-    private const int focusRadius = 2;
+    private int focusRadius = 2; // Will be set dynamically based on probe iteration
 
     // Definition of dictionary for the visibility of the probes
     private Dictionary<GameObject, bool> originalProbeVisibility = new Dictionary<GameObject, bool>();
@@ -106,6 +106,28 @@ public class FocusSystem : MonoBehaviour
     {
         isInFocusMode = true;
         currentFocusProbeIndex = probeIndex;
+        
+        // Set focus radius based on probe's iteration level
+        // Get the selected probe GameObject
+        if (probeDots != null && probeIndex >= 0 && probeIndex < probeDots.probes.Count)
+        {
+            GameObject selectedProbe = probeDots.probes[probeIndex];
+            
+            // Determine iteration level from GridRebuildManager
+            if (gridRebuildManager != null && selectedProbe != null)
+            {
+                // Check the probe's influence radius to determine its iteration
+                // Iteration 1: radius = 2, Iteration 2+: radius = 1
+                int probeInfluenceRadius = GetProbeInfluenceRadius(selectedProbe);
+                focusRadius = probeInfluenceRadius;
+            }
+            else
+            {
+                // Default to iteration 1 if we can't determine
+                focusRadius = 2;
+            }
+        }
+        
         HideAllProbesExcept(probeIndex);
         ShowFocusAreaAroundProbe(probeIndex);
     }
@@ -329,5 +351,15 @@ public class FocusSystem : MonoBehaviour
             return Vector2Int.zero;
         }
         return gridRebuildManager.GetProbeGridCell(probe); // use the deformation manager to obtain the grid cell of the probe dot
+    }
+
+    // HELPER FUNCTION: Get the influence radius for a probe (determines iteration level)
+    private int GetProbeInfluenceRadius(GameObject probe)
+    {
+        if (gridRebuildManager == null || probe == null)
+        {
+            return 2; // Default to iteration 1
+        }
+        return gridRebuildManager.GetProbeInfluenceRadius(probe);
     }
 }

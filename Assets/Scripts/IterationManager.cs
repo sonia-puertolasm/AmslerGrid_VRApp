@@ -80,16 +80,72 @@ public class IterationManager : MonoBehaviour
     {
         if (currentIteration == 1 && probeDots != null && probeDots.selectedProbeIndex >= 0)
         {
-            AdvanceToIteration2();
+            // Check if iteration 2 already exists (user went back and is now going forward)
+            if (iteration2Probes != null && iteration2Probes.Count > 0)
+            {
+                ReturnToIteration2();
+            }
+            else
+            {
+                AdvanceToIteration2();
+            }
         }
+    }
+
+    private void ReturnToIteration2()
+    {
+        // Hide iteration 1 probes
+        HideIteration1Probes();
+
+        // Exit focus mode if active
+        if (focusSystem != null && focusSystem.focusSystemEnabled)
+        {
+            focusSystem.ExitFocusMode();
+        }
+
+        // Show existing iteration 2 probes
+        foreach (GameObject probe in iteration2Probes)
+        {
+            if (probe != null)
+            {
+                probe.SetActive(true);
+                Renderer renderer = probe.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                }
+            }
+        }
+
+        // Show iteration 2 fixation point
+        if (iteration2CenterFixationPoint != null)
+        {
+            iteration2CenterFixationPoint.SetActive(true);
+            Renderer renderer = iteration2CenterFixationPoint.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = true;
+            }
+        }
+
+        // Switch active probe list to iteration 2
+        probeDots.probes = new List<GameObject>(iteration2Probes);
+        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(iteration2InitialPositions);
+        probeDots.selectedProbeIndex = -1;
+
+        currentIteration = 2;
     }
 
     private void HandleBackspaceKey()
     {
-        // Only allow going back if in iteration 2 AND no probe is currently selected (probe-selection mode)
-        if (currentIteration == 2 && probeDots != null && probeDots.selectedProbeIndex == -1)
+        // Only allow going back if not in iteration 1 AND no probe is currently selected
+        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1)
         {
-            ReturnToIteration1();
+            if (currentIteration == 2)
+            {
+                ReturnToIteration1();
+            }
+            // Can add more iteration levels here in the future
         }
     }
 
@@ -123,10 +179,9 @@ public class IterationManager : MonoBehaviour
 
         probeDots.selectedProbeIndex = -1;
 
-        if (gridRebuildManager != null)
-        {
-            gridRebuildManager.ForceRebuild();
-        }
+        // Don't call ForceRebuild here - iteration 2 probes start at their "home" positions
+        // on the deformed grid with zero displacement, so they don't affect deformation yet.
+        // The grid will rebuild automatically in LateUpdate when probes actually move.
     }
 
     private void CreateIteration2CenterFixationPoint()
@@ -201,6 +256,18 @@ public class IterationManager : MonoBehaviour
 
             Vector3 snappedPosition = SnapToNearestGridPoint(targetPosition);
 
+            if (gridRebuildManager != null)
+            {
+                int gridSizeValue = gridRebuildManager.GetGridSize();
+                Vector2Int gridIndex = GetGridIndexFromPosition(snappedPosition);
+                
+                if (gridIndex.x == 0 || gridIndex.x == gridSizeValue || 
+                    gridIndex.y == 0 || gridIndex.y == gridSizeValue)
+                {
+                    continue;
+                }
+            }
+
             GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             probe.name = $"ProbePoint_Iteration2_{i}";
             probe.transform.position = snappedPosition;
@@ -247,9 +314,9 @@ public class IterationManager : MonoBehaviour
         {
             for (int col = 0; col <= gridSize; col++)
             {
-                // Use ORIGINAL grid points instead of deformed points
-                // This ensures iteration 2+ probes snap to the undeformed grid structure
-                Vector3 gridPoint = gridRebuildManager.GetOriginalGridPoint(row, col);
+                // Use DEFORMED grid points for iteration 2+ probes
+                // This ensures new probes sit on the already-deformed grid
+                Vector3 gridPoint = gridRebuildManager.GetDeformedGridPoint(row, col);
 
                 gridPoint.z = targetPosition.z;
 
@@ -304,24 +371,30 @@ public class IterationManager : MonoBehaviour
 
     private void ReturnToIteration1()
     {
+        // HIDE iteration 2 probes - do NOT destroy or unregister
+        // This preserves their deformations (truly accumulative)
         foreach (GameObject probe in iteration2Probes)
         {
             if (probe != null)
             {
-                if (gridRebuildManager != null)
+                probe.SetActive(false);
+                Renderer renderer = probe.GetComponent<Renderer>();
+                if (renderer != null)
                 {
-                    gridRebuildManager.UnregisterProbe(probe);
+                    renderer.enabled = false;
                 }
-                Destroy(probe);
             }
         }
-        iteration2Probes.Clear();
-        iteration2InitialPositions.Clear();
 
+        // HIDE iteration 2 center fixation point - do NOT destroy
         if (iteration2CenterFixationPoint != null)
         {
-            Destroy(iteration2CenterFixationPoint);
-            iteration2CenterFixationPoint = null;
+            iteration2CenterFixationPoint.SetActive(false);
+            Renderer renderer = iteration2CenterFixationPoint.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = false;
+            }
         }
 
         if (iterationProbes.ContainsKey(1))
@@ -371,13 +444,25 @@ public class IterationManager : MonoBehaviour
         probeDots.selectedProbeIndex = -1;
 
         currentIteration = 1;
-
-        if (gridRebuildManager != null)
-        {
-            gridRebuildManager.ForceRebuild();
-        }
     }
 
     public int CurrentIteration => currentIteration;
     public bool IsInIteration2 => currentIteration == 2;
+
+    private Vector2Int GetGridIndexFromPosition(Vector3 position)
+    {
+        if (mainGrid == null)
+            return Vector2Int.zero;
+
+        float originX = gridCenter.x - halfWidth;
+        float originY = gridCenter.y - halfWidth;
+
+        int col = Mathf.RoundToInt((position.x - originX) / cellSize);
+        int row = Mathf.RoundToInt((position.y - originY) / cellSize);
+
+        col = Mathf.Clamp(col, 0, gridSize);
+        row = Mathf.Clamp(row, 0, gridSize);
+
+        return new Vector2Int(col, row);
+    }
 }
