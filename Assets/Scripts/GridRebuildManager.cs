@@ -29,6 +29,8 @@ public class GridRebuildManager : MonoBehaviour
     private List<GameObject> allProbes = new List<GameObject>();
     
     private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
+    
+    private Dictionary<GameObject, Vector2Int> probeGridIndices = new Dictionary<GameObject, Vector2Int>();
 
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
@@ -208,6 +210,40 @@ public class GridRebuildManager : MonoBehaviour
         UpdateHorizontalLines();
 
         UpdateVerticalLines();
+        
+        UpdateProbePositionsToGrid();
+    }
+
+    private void UpdateProbePositionsToGrid()
+    {
+        if (probeDots == null)
+            return;
+
+        foreach (GameObject probe in allProbes)
+        {
+            if (probe == null || !probe.activeInHierarchy)
+                continue;
+
+            int probeIndex = probeDots.probes.IndexOf(probe);
+            if (probeIndex == probeDots.selectedProbeIndex)
+                continue;
+
+            if (!probeGridIndices.ContainsKey(probe))
+                continue;
+
+            Vector2Int gridIndex = probeGridIndices[probe];
+            
+            if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
+                continue;
+            
+            Vector3 deformedPos = currentGridPoints[gridIndex.y, gridIndex.x];
+            
+            float probeZ = gridCenter.z - 0.15f;
+            deformedPos.z = probeZ;
+            
+            probe.transform.position = deformedPos;
+            // Do NOT update probeOriginalPositions - keep the true original positions for accumulative deformation
+        }
     }
 
     private void CalculateDeformedGridPoints()
@@ -515,7 +551,7 @@ public class GridRebuildManager : MonoBehaviour
         return Vector3.zero;
     }
 
-    public void RegisterProbe(GameObject probe, Vector3 originalPosition, int iterationLevel = 1)
+    public void RegisterProbe(GameObject probe, Vector3 originalPosition, int iterationLevel = 1, Vector2Int? gridIndex = null)
     {
         if (probe != null && !allProbes.Contains(probe))
         {
@@ -524,6 +560,16 @@ public class GridRebuildManager : MonoBehaviour
             
             int influenceRadius = (iterationLevel == 1) ? 2 : 1;
             probeInfluenceRadius[probe] = influenceRadius;
+            
+            if (gridIndex.HasValue)
+            {
+                probeGridIndices[probe] = gridIndex.Value;
+            }
+            else
+            {
+                Vector2Int calculatedIndex = GetProbeGridIndex(probe);
+                probeGridIndices[probe] = calculatedIndex;
+            }
         }
     }
 
@@ -534,6 +580,7 @@ public class GridRebuildManager : MonoBehaviour
             allProbes.Remove(probe);
             probeOriginalPositions.Remove(probe);
             probeInfluenceRadius.Remove(probe);
+            probeGridIndices.Remove(probe);
         }
     }
 
