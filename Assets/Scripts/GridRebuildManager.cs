@@ -231,6 +231,10 @@ public class GridRebuildManager : MonoBehaviour
             if (!probeGridIndices.ContainsKey(probe))
                 continue;
 
+            int influenceRadius = GetProbeInfluenceRadius(probe);
+            if (influenceRadius == 1)
+                continue;
+
             Vector2Int gridIndex = probeGridIndices[probe];
             
             if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
@@ -242,7 +246,6 @@ public class GridRebuildManager : MonoBehaviour
             deformedPos.z = probeZ;
             
             probe.transform.position = deformedPos;
-            // Do NOT update probeOriginalPositions - keep the true original positions for accumulative deformation
         }
     }
 
