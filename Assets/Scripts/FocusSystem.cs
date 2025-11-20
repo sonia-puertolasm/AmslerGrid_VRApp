@@ -7,6 +7,7 @@ public class FocusSystem : MonoBehaviour
     // Definition of grid configuration specific parameters
     private ProbeDots probeDots;
     private GridRebuildManager gridRebuildManager;
+    private IterationManager iterationManager;
     private GameObject centerFixationPoint;
      private int gridSize;
     private float cellSize;
@@ -57,6 +58,7 @@ public class FocusSystem : MonoBehaviour
     {
         probeDots = FindObjectOfType<ProbeDots>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
+        iterationManager = FindObjectOfType<IterationManager>();
         centerFixationPoint = GameObject.Find("CenterFixationPoint");
 
         MainGrid mainGrid = FindObjectOfType<MainGrid>();
@@ -161,7 +163,7 @@ public class FocusSystem : MonoBehaviour
         if (selectedProbe == null) // Safety: exit in case of no selected probe
             return;
 
-        //Definition of probe grid position in x-axis and y-axis    
+        //Definition of probe grid position in x-axis and y-axis
         Vector2Int probeGridPos = GetProbeGridIndex(selectedProbe);
         int probeRow = probeGridPos.y;
         int probeCol = probeGridPos.x;
@@ -180,11 +182,14 @@ public class FocusSystem : MonoBehaviour
                 lr.enabled = false;
         }
 
+        // Determine focus radius based on current iteration (2x2x2x2 for iteration 1, 1x1x1x1 for higher iterations)
+        int currentFocusRadius = (iterationManager != null && iterationManager.CurrentIteration > 1) ? 1 : focusRadius;
+
         // Definition of min and max ranges of column and row for focus mode of probe of interest
-        currentFocusMinCol = Mathf.Max(0, probeCol - focusRadius);
-        currentFocusMaxCol = Mathf.Min(gridSize, probeCol + focusRadius);
-        currentFocusMinRow = Mathf.Max(0, probeRow - focusRadius);
-        currentFocusMaxRow = Mathf.Min(gridSize, probeRow + focusRadius);
+        currentFocusMinCol = Mathf.Max(0, probeCol - currentFocusRadius);
+        currentFocusMaxCol = Mathf.Min(gridSize, probeCol + currentFocusRadius);
+        currentFocusMinRow = Mathf.Max(0, probeRow - currentFocusRadius);
+        currentFocusMaxRow = Mathf.Min(gridSize, probeRow + currentFocusRadius);
 
         // Showing of only vertical and horizontal lines that go through the selected probe dot
         if (probeRow >= 0 && probeRow < gridRebuildManager.horizontalLinePool.Count)

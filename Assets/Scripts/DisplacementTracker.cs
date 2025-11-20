@@ -38,7 +38,6 @@ public class DisplacementTracker : MonoBehaviour
         public Vector3 displacementVector3D;
         public float displacementMagnitude;
 
-        //
         public ProbeDisplacement(int index, Vector3 origPos, Vector3 currPos)
         {
             probeIndex = index; // Probe's index
@@ -216,7 +215,7 @@ public class DisplacementTracker : MonoBehaviour
         ClearIterationHistory();
     }
 
-    // Defined variables for further use
+    // Definition of variables for further use
     public bool IsInitialized => isInitialized; // Initialization status
     public int ProbeCount => probeDots != null ? probeDots.probes.Count : 0; // Returns how many probe dots is there as long as there is any number except 0
 }

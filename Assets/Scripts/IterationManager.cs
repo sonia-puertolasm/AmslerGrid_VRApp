@@ -247,6 +247,9 @@ public class IterationManager : MonoBehaviour
         parentProbeToIteration2Probes[parentProbeIndex] = newIteration2Probes;
         parentProbeToIteration2Positions[parentProbeIndex] = newIteration2Positions;
 
+        parentProbeToIteration2Probes[parentProbeIndex] = newIteration2Probes;
+        parentProbeToIteration2Positions[parentProbeIndex] = newIteration2Positions;
+
         probeDots.probes = new List<GameObject>(newIteration2Probes);
         probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(newIteration2Positions);
         probeDots.selectedProbeIndex = -1;
