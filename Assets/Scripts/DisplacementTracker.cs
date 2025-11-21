@@ -14,6 +14,10 @@ public class DisplacementTracker : MonoBehaviour
 
     private bool isInitialized = false;
 
+    // Live displacement tracking
+    private Dictionary<int, ProbeDisplacement> currentLiveDisplacements = new Dictionary<int, ProbeDisplacement>();
+    private bool liveUpdateEnabled = true;
+
     // Definition of iteration displacement data
     public class IterationDisplacementData
     {
@@ -54,6 +58,32 @@ public class DisplacementTracker : MonoBehaviour
     private void Start()
     {
         StartCoroutine(InitializeTracker());
+    }
+
+    // Live update of displacement tracking every frame
+    private void LateUpdate()
+    {
+        if (!isInitialized || !liveUpdateEnabled || probeDots == null)
+        {
+            return;
+        }
+
+        UpdateLiveDisplacements();
+    }
+
+    // FUNCTION: Updates the live displacement dictionary with current probe positions
+    private void UpdateLiveDisplacements()
+    {
+        currentLiveDisplacements.Clear();
+
+        for (int i = 0; i < probeDots.probes.Count; i++)
+        {
+            ProbeDisplacement displacement = GetProbeDisplacement(i);
+            if (displacement != null)
+            {
+                currentLiveDisplacements[i] = displacement;
+            }
+        }
     }
 
     // Coroutine to initialize tracking of displacement until after grid is generated  -> allows method to pause and resume
@@ -146,6 +176,27 @@ public class DisplacementTracker : MonoBehaviour
         return allDisplacements;
     }
 
+    // FUNCTION: Returns the current live displacement dictionary (updated every frame)
+    public Dictionary<int, ProbeDisplacement> GetLiveDisplacements()
+    {
+        if (!isInitialized)
+        {
+            return new Dictionary<int, ProbeDisplacement>();
+        }
+
+        return new Dictionary<int, ProbeDisplacement>(currentLiveDisplacements);
+    }
+
+    // FUNCTION: Get live displacement for a specific probe index
+    public ProbeDisplacement GetLiveDisplacement(int probeIndex)
+    {
+        if (currentLiveDisplacements.ContainsKey(probeIndex))
+        {
+            return currentLiveDisplacements[probeIndex];
+        }
+        return null;
+    }
+
     // HELPER FUNCTION: Determines whether a probe dot has moved (or not)
     public bool HasProbeMoved(int probeIndex, float threshold = 0.01f)
     {
@@ -215,7 +266,14 @@ public class DisplacementTracker : MonoBehaviour
         ClearIterationHistory();
     }
 
+    // FUNCTION: Enable or disable live update mode
+    public void SetLiveUpdateMode(bool enabled)
+    {
+        liveUpdateEnabled = enabled;
+    }
+
     // Definition of variables for further use
     public bool IsInitialized => isInitialized; // Initialization status
     public int ProbeCount => probeDots != null ? probeDots.probes.Count : 0; // Returns how many probe dots is there as long as there is any number except 0
+    public bool LiveUpdateEnabled => liveUpdateEnabled; // Live update status
 }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class GridRebuildManager : MonoBehaviour
@@ -15,6 +14,9 @@ public class GridRebuildManager : MonoBehaviour
 
     private Vector3[,] originalGridPoints;
     private Vector3[,] currentGridPoints;
+    
+    // This is the ONLY source of truth for deformation
+    private Vector3[,] accumulatedDisplacement;
 
     public List<LineRenderer> horizontalLinePool = new List<LineRenderer>();
     public List<LineRenderer> verticalLinePool = new List<LineRenderer>();
@@ -25,11 +27,8 @@ public class GridRebuildManager : MonoBehaviour
     private Vector3[] lastProbePositions;
 
     public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
-
     private List<GameObject> allProbes = new List<GameObject>();
-    
     private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
-    
     private Dictionary<GameObject, Vector2Int> probeGridIndices = new Dictionary<GameObject, Vector2Int>();
 
     private float lineWidth = 0.15f;
@@ -64,11 +63,10 @@ public class GridRebuildManager : MonoBehaviour
         int pointCount = gridSize + 1;
         originalGridPoints = new Vector3[pointCount, pointCount];
         currentGridPoints = new Vector3[pointCount, pointCount];
+        accumulatedDisplacement = new Vector3[pointCount, pointCount];
 
         CalculateOriginalGridPoints();
-
         HideOriginalGridLines();
-
         CreateLineRendererPool();
 
         lastProbePositions = new Vector3[probeDots.probes.Count];
@@ -117,6 +115,7 @@ public class GridRebuildManager : MonoBehaviour
 
                 originalGridPoints[row, col] = new Vector3(x, y, z);
                 currentGridPoints[row, col] = originalGridPoints[row, col];
+                accumulatedDisplacement[row, col] = Vector3.zero;
             }
         }
     }
@@ -205,16 +204,107 @@ public class GridRebuildManager : MonoBehaviour
 
     private void RebuildGrid()
     {
-        CalculateDeformedGridPoints();
+        // Step 1: Calculate NEW displacement contributions from currently moving probe
+        CalculateDisplacementContributions();
+        
+        // Step 2: Apply accumulated displacement to get current grid
+        ApplyAccumulatedDisplacement();
 
+        // Step 3: Update line renderers
         UpdateHorizontalLines();
-
         UpdateVerticalLines();
         
-        UpdateProbePositionsToGrid();
+        // Step 4: Update ALL probe positions to follow their grid points
+        UpdateAllProbesToGrid();
     }
 
-    private void UpdateProbePositionsToGrid()
+    // This calculates the displacement contribution from the currently selected/moving probe
+    private void CalculateDisplacementContributions()
+    {
+        if (probeDots == null || probeDots.selectedProbeIndex < 0)
+            return;
+
+        int pointCount = gridSize + 1;
+        GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+        
+        if (selectedProbe == null)
+            return;
+
+        Vector3 probeCurrentPos = selectedProbe.transform.position;
+        Vector3 probeOriginalPos = GetProbeOriginalPosition(selectedProbe);
+        
+        // Calculate how much THIS probe has moved from its original position
+        Vector3 totalProbeDisplacement = probeCurrentPos - probeOriginalPos;
+        
+        // Calculate how much the grid point where this probe sits has already been displaced
+        Vector2Int probeGridIndex = GetProbeGridIndex(selectedProbe);
+        int probeRow = probeGridIndex.y;
+        int probeCol = probeGridIndex.x;
+        
+        Vector3 gridPointCurrentDisplacement = accumulatedDisplacement[probeRow, probeCol];
+        
+        // The NEW displacement this probe is adding is the difference
+        Vector3 newDisplacementFromProbe = totalProbeDisplacement - gridPointCurrentDisplacement;
+
+        if (newDisplacementFromProbe.magnitude < 0.001f)
+            return;
+
+        int maxInfluenceRadius = 2;
+        if (probeInfluenceRadius.ContainsKey(selectedProbe))
+        {
+            maxInfluenceRadius = probeInfluenceRadius[selectedProbe];
+        }
+
+        int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, maxInfluenceRadius, selectedProbe);
+        int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, maxInfluenceRadius, selectedProbe);
+        int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, maxInfluenceRadius, selectedProbe);
+        int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, maxInfluenceRadius, selectedProbe);
+
+        int minCol = Mathf.Max(0, probeCol - leftLimit);
+        int maxCol = Mathf.Min(gridSize, probeCol + rightLimit);
+        int minRow = Mathf.Max(0, probeRow - downLimit);
+        int maxRow = Mathf.Min(gridSize, probeRow + upLimit);
+
+        for (int row = minRow; row <= maxRow; row++)
+        {
+            for (int col = minCol; col <= maxCol; col++)
+            {
+                // Skip boundary points
+                if (row == 0 || row == gridSize || col == 0 || col == gridSize)
+                    continue;
+
+                // Skip center fixation
+                if (IsCenterFixationAtGridPoint(row, col))
+                    continue;
+
+                int deltaRow = row - probeRow;
+                int deltaCol = col - probeCol;
+
+                float colWeight = CalculateAdaptiveWeight(deltaCol, -leftLimit, rightLimit);
+                float rowWeight = CalculateAdaptiveWeight(deltaRow, -downLimit, upLimit);
+                float combinedWeight = colWeight * rowWeight;
+
+                // ADD to accumulated displacement (accumulative)
+                accumulatedDisplacement[row, col] += newDisplacementFromProbe * combinedWeight;
+            }
+        }
+    }
+
+    private void ApplyAccumulatedDisplacement()
+    {
+        int pointCount = gridSize + 1;
+
+        for (int row = 0; row < pointCount; row++)
+        {
+            for (int col = 0; col < pointCount; col++)
+            {
+                currentGridPoints[row, col] = originalGridPoints[row, col] + accumulatedDisplacement[row, col];
+            }
+        }
+    }
+
+    // This updates ALL probes (both iteration 1 and iteration 2) to follow their grid points
+    private void UpdateAllProbesToGrid()
     {
         if (probeDots == null)
             return;
@@ -224,6 +314,7 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == null || !probe.activeInHierarchy)
                 continue;
 
+            // Don't move the probe that's currently being dragged by the user
             int probeIndex = probeDots.probes.IndexOf(probe);
             if (probeIndex == probeDots.selectedProbeIndex)
                 continue;
@@ -236,90 +327,13 @@ public class GridRebuildManager : MonoBehaviour
             if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
                 continue;
             
+            // Get the deformed position of this grid point
             Vector3 deformedPos = currentGridPoints[gridIndex.y, gridIndex.x];
-            
             float probeZ = gridCenter.z - 0.15f;
             deformedPos.z = probeZ;
             
-            Vector3 currentProbePos = probe.transform.position;
-            Vector3 expectedDeformedPos = deformedPos;
-            
-            float manualAdjustmentThreshold = 0.01f;
-            if (Vector3.Distance(currentProbePos, expectedDeformedPos) < manualAdjustmentThreshold)
-            {
-                probe.transform.position = deformedPos;
-            }
-        }
-    }
-
-    private void CalculateDeformedGridPoints()
-    {
-        int pointCount = gridSize + 1;
-
-        for (int row = 0; row < pointCount; row++)
-        {
-            for (int col = 0; col < pointCount; col++)
-            {
-                currentGridPoints[row, col] = originalGridPoints[row, col];
-            }
-        }
-
-        foreach (GameObject probe in allProbes)
-        {
-            if (probe == null)
-                continue;
-
-            Vector3 probeCurrentPos = probe.transform.position;
-            Vector3 probeOriginalPos = GetProbeOriginalPosition(probe);
-            Vector3 probeDisplacement = probeCurrentPos - probeOriginalPos;
-
-            if (probeDisplacement.magnitude < 0.001f)
-                continue;
-
-            Vector2Int probeGridIndex = GetProbeGridIndex(probe);
-            int probeRow = probeGridIndex.y;
-            int probeCol = probeGridIndex.x;
-
-            int maxInfluenceRadius = 2;
-            if (probeInfluenceRadius.ContainsKey(probe))
-            {
-                maxInfluenceRadius = probeInfluenceRadius[probe];
-            }
-
-            int leftLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, -1, maxInfluenceRadius, probe);
-            int rightLimit = FindNearestProbeInDirection(probeRow, probeCol, 0, 1, maxInfluenceRadius, probe);
-            int upLimit = FindNearestProbeInDirection(probeRow, probeCol, 1, 0, maxInfluenceRadius, probe);
-            int downLimit = FindNearestProbeInDirection(probeRow, probeCol, -1, 0, maxInfluenceRadius, probe);
-
-            int minCol = Mathf.Max(0, probeCol - leftLimit);
-            int maxCol = Mathf.Min(gridSize, probeCol + rightLimit);
-            int minRow = Mathf.Max(0, probeRow - downLimit);
-            int maxRow = Mathf.Min(gridSize, probeRow + upLimit);
-
-            for (int row = minRow; row <= maxRow; row++)
-            {
-                for (int col = minCol; col <= maxCol; col++)
-                {
-                    if (row == 0 || row == gridSize || col == 0 || col == gridSize)
-                        continue;
-
-                    if (IsProbeAtGridPoint(row, col, probe))
-                        continue;
-
-                    if (IsCenterFixationAtGridPoint(row, col))
-                        continue;
-
-                    int deltaRow = row - probeRow;
-                    int deltaCol = col - probeCol;
-
-                    float colWeight = CalculateAdaptiveWeight(deltaCol, -leftLimit, rightLimit);
-                    float rowWeight = CalculateAdaptiveWeight(deltaRow, -downLimit, upLimit);
-
-                    float combinedWeight = colWeight * rowWeight;
-
-                    currentGridPoints[row, col] += probeDisplacement * combinedWeight;
-                }
-            }
+            // Move the probe to follow the grid
+            probe.transform.position = deformedPos;
         }
     }
 
@@ -452,6 +466,11 @@ public class GridRebuildManager : MonoBehaviour
 
     private Vector2Int GetProbeGridIndex(GameObject obj)
     {
+        if (probeGridIndices.ContainsKey(obj))
+        {
+            return probeGridIndices[obj];
+        }
+
         Vector3 objOriginalPos;
 
         if (probeOriginalPositions.ContainsKey(obj))
@@ -522,6 +541,7 @@ public class GridRebuildManager : MonoBehaviour
         {
             for (int col = 0; col < pointCount; col++)
             {
+                accumulatedDisplacement[row, col] = Vector3.zero;
                 currentGridPoints[row, col] = originalGridPoints[row, col];
             }
         }
@@ -553,6 +573,15 @@ public class GridRebuildManager : MonoBehaviour
         if (originalGridPoints != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
         {
             return originalGridPoints[row, col];
+        }
+        return Vector3.zero;
+    }
+
+    public Vector3 GetAccumulatedDisplacement(int row, int col)
+    {
+        if (accumulatedDisplacement != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
+        {
+            return accumulatedDisplacement[row, col];
         }
         return Vector3.zero;
     }

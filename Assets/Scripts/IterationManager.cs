@@ -19,6 +19,10 @@ public class IterationManager : MonoBehaviour
     private Dictionary<int, List<GameObject>> parentProbeToIteration2Probes = new Dictionary<int, List<GameObject>>();
     private Dictionary<int, Dictionary<GameObject, Vector3>> parentProbeToIteration2Positions = new Dictionary<int, Dictionary<GameObject, Vector3>>();
 
+    // Track which grid points are already occupied by IT2 probes from any parent
+    private HashSet<Vector2Int> occupiedIT2GridPoints = new HashSet<Vector2Int>();
+    private Dictionary<Vector2Int, int> gridPointToParentIndex = new Dictionary<Vector2Int, int>();
+
     private float spacingScaleFactor = 0.5f;
 
     private int gridSize;
@@ -149,6 +153,12 @@ public class IterationManager : MonoBehaviour
             return;
         }
 
+        // Save displacement snapshot for Iteration 1 before advancing
+        if (displacementTracker != null && displacementTracker.IsInitialized)
+        {
+            displacementTracker.SaveIterationSnapshot(1);
+        }
+
         Vector3 newCenterPosition = selectedProbe.transform.position;
 
         HideIteration1Probes();
@@ -210,8 +220,8 @@ public class IterationManager : MonoBehaviour
         if (gridRebuildManager != null)
         {
             int gridSizeValue = gridRebuildManager.GetGridSize();
-            
-            if (gridIndex.x == 0 || gridIndex.x == gridSizeValue || 
+
+            if (gridIndex.x == 0 || gridIndex.x == gridSizeValue ||
                 gridIndex.y == 0 || gridIndex.y == gridSizeValue)
             {
                 continue;
@@ -225,7 +235,7 @@ public class IterationManager : MonoBehaviour
 
         Vector3 currentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(gridIndex.y, gridIndex.x);
         currentDeformedPosition.z = centerPosition.z;
-        
+
         probe.transform.position = currentDeformedPosition;
 
         Renderer renderer = probe.GetComponent<Renderer>();
