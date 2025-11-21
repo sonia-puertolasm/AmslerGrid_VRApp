@@ -181,75 +181,116 @@ public class IterationManager : MonoBehaviour
     }
 
     private void SpawnIteration2Probes(Vector3 centerPosition, int parentProbeIndex)
+{
+    List<GameObject> newIteration2Probes = new List<GameObject>();
+    Dictionary<GameObject, Vector3> newIteration2Positions = new Dictionary<GameObject, Vector3>();
+
+    float originalSpacing = probeDots.probeSpacing;
+    float newSpacing = originalSpacing * spacingScaleFactor;
+
+    Vector3[] relativePositions = new Vector3[]
     {
-        List<GameObject> newIteration2Probes = new List<GameObject>();
-        Dictionary<GameObject, Vector3> newIteration2Positions = new Dictionary<GameObject, Vector3>();
+        new Vector3(-newSpacing, -newSpacing, 0),
+        new Vector3(0, -newSpacing, 0),
+        new Vector3(newSpacing, -newSpacing, 0),
+        new Vector3(-newSpacing, 0, 0),
+        new Vector3(newSpacing, 0, 0),
+        new Vector3(-newSpacing, newSpacing, 0),
+        new Vector3(0, newSpacing, 0),
+        new Vector3(newSpacing, newSpacing, 0)
+    };
 
-        float originalSpacing = probeDots.probeSpacing;
-        float newSpacing = originalSpacing * spacingScaleFactor;
+    for (int i = 0; i < relativePositions.Length; i++)
+    {
+        Vector3 targetPosition = centerPosition + relativePositions[i];
 
-        Vector3[] relativePositions = new Vector3[]
+        Vector2Int gridIndex;
+        Vector3 originalGridPosition = SnapToOriginalGridPointWithIndex(targetPosition, out gridIndex);
+
+        if (gridRebuildManager != null)
         {
-            new Vector3(-newSpacing, -newSpacing, 0),
-            new Vector3(0, -newSpacing, 0),
-            new Vector3(newSpacing, -newSpacing, 0),
-            new Vector3(-newSpacing, 0, 0),
-            new Vector3(newSpacing, 0, 0),
-            new Vector3(-newSpacing, newSpacing, 0),
-            new Vector3(0, newSpacing, 0),
-            new Vector3(newSpacing, newSpacing, 0)
-        };
-
-        for (int i = 0; i < relativePositions.Length; i++)
-        {
-            Vector3 targetPosition = centerPosition + relativePositions[i];
-
-            Vector2Int gridIndex;
-            Vector3 snappedPosition = SnapToNearestGridPointWithIndex(targetPosition, out gridIndex);
-
-            if (gridRebuildManager != null)
+            int gridSizeValue = gridRebuildManager.GetGridSize();
+            
+            if (gridIndex.x == 0 || gridIndex.x == gridSizeValue || 
+                gridIndex.y == 0 || gridIndex.y == gridSizeValue)
             {
-                int gridSizeValue = gridRebuildManager.GetGridSize();
-                
-                if (gridIndex.x == 0 || gridIndex.x == gridSizeValue || 
-                    gridIndex.y == 0 || gridIndex.y == gridSizeValue)
-                {
-                    continue;
-                }
-            }
-
-            GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            probe.name = $"ProbePoint_Parent{parentProbeIndex}_Iteration2_{i}";
-            probe.transform.position = snappedPosition;
-            probe.transform.localScale = Vector3.one * probeDots.probeDotSize;
-            probe.transform.SetParent(transform);
-
-            Renderer renderer = probe.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.enabled = true;
-                renderer.material.color = ProbeColors.Default;
-            }
-
-            GridPointData pointData = probe.AddComponent<GridPointData>();
-            pointData.isInteractable = true;
-
-            newIteration2Positions[probe] = snappedPosition;
-
-            newIteration2Probes.Add(probe);
-
-            if (gridRebuildManager != null)
-            {
-                gridRebuildManager.RegisterProbe(probe, snappedPosition, 2, gridIndex);
+                continue;
             }
         }
 
-        parentProbeToIteration2Probes[parentProbeIndex] = newIteration2Probes;
-        parentProbeToIteration2Positions[parentProbeIndex] = newIteration2Positions;
+        GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        probe.name = $"ProbePoint_Parent{parentProbeIndex}_Iteration2_{i}";
+        probe.transform.localScale = Vector3.one * probeDots.probeDotSize;
+        probe.transform.SetParent(transform);
 
-        probeDots.probes = new List<GameObject>(newIteration2Probes);
-        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(newIteration2Positions);
-        probeDots.selectedProbeIndex = -1;
+        Vector3 currentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(gridIndex.y, gridIndex.x);
+        currentDeformedPosition.z = centerPosition.z;
+        
+        probe.transform.position = currentDeformedPosition;
+
+        Renderer renderer = probe.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.enabled = true;
+            renderer.material.color = ProbeColors.Default;
+        }
+
+        GridPointData pointData = probe.AddComponent<GridPointData>();
+        pointData.isInteractable = true;
+
+        newIteration2Positions[probe] = originalGridPosition;
+
+        newIteration2Probes.Add(probe);
+
+        if (gridRebuildManager != null)
+        {
+            gridRebuildManager.RegisterProbe(probe, originalGridPosition, 2, gridIndex);
+        }
+    }
+
+    parentProbeToIteration2Probes[parentProbeIndex] = newIteration2Probes;
+    parentProbeToIteration2Positions[parentProbeIndex] = newIteration2Positions;
+
+    probeDots.probes = new List<GameObject>(newIteration2Probes);
+    probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(newIteration2Positions);
+    probeDots.selectedProbeIndex = -1;
+    
+    if (gridRebuildManager != null)
+    {
+        gridRebuildManager.ForceRebuild();
+    }
+}
+
+    private Vector3 SnapToOriginalGridPointWithIndex(Vector3 targetPosition, out Vector2Int gridIndex)
+    {
+        gridIndex = Vector2Int.zero;
+        
+        if (gridRebuildManager == null)
+            return targetPosition;
+
+        int gridSizeValue = gridRebuildManager.GetGridSize();
+        float minDistance = float.MaxValue;
+        Vector3 closestPoint = targetPosition;
+
+        for (int row = 0; row <= gridSizeValue; row++)
+        {
+            for (int col = 0; col <= gridSizeValue; col++)
+            {
+                Vector3 gridPoint = gridRebuildManager.GetOriginalGridPoint(row, col);
+                gridPoint.z = targetPosition.z;
+
+                float distance = Vector3.Distance(targetPosition, gridPoint);
+
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestPoint = gridPoint;
+                    gridIndex = new Vector2Int(col, row);
+                }
+            }
+        }
+
+        return closestPoint;
     }
 
     private Vector3 SnapToNearestGridPoint(Vector3 targetPosition)

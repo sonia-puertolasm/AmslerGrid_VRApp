@@ -241,7 +241,14 @@ public class GridRebuildManager : MonoBehaviour
             float probeZ = gridCenter.z - 0.15f;
             deformedPos.z = probeZ;
             
-            probe.transform.position = deformedPos;
+            Vector3 currentProbePos = probe.transform.position;
+            Vector3 expectedDeformedPos = deformedPos;
+            
+            float manualAdjustmentThreshold = 0.01f;
+            if (Vector3.Distance(currentProbePos, expectedDeformedPos) < manualAdjustmentThreshold)
+            {
+                probe.transform.position = deformedPos;
+            }
         }
     }
 
