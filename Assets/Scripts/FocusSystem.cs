@@ -59,6 +59,9 @@ public class FocusSystem : MonoBehaviour
             gridSize = mainGrid.GridSize;
             gridCenter = mainGrid.GridCenterPosition;
         }
+
+        // Enable the focus system
+        focusSystemEnabled = true;
     }
 
     // Callback method for every frame

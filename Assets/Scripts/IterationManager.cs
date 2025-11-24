@@ -7,6 +7,7 @@ public class IterationManager : MonoBehaviour
     private ProbeDots probeDots;
     private MainGrid mainGrid;
     private GridRebuildManager gridRebuildManager;
+    private DisplacementTracker displacementTracker;
     private FocusSystem focusSystem;
 
     private int currentIteration = 1;
@@ -18,18 +19,25 @@ public class IterationManager : MonoBehaviour
     private Dictionary<int, List<GameObject>> parentProbeToIteration2Probes = new Dictionary<int, List<GameObject>>();
     private Dictionary<int, Dictionary<GameObject, Vector3>> parentProbeToIteration2Positions = new Dictionary<int, Dictionary<GameObject, Vector3>>();
 
+    private int gridSize;
+    private float cellSize;
     private Vector3 gridCenter;
+    private float halfWidth;
 
     void Start()
     {
         probeDots = FindObjectOfType<ProbeDots>();
         mainGrid = FindObjectOfType<MainGrid>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
+        displacementTracker = FindObjectOfType<DisplacementTracker>();
         focusSystem = FindObjectOfType<FocusSystem>();
 
         if (mainGrid != null)
         {
+            gridSize = mainGrid.GridSize;
+            cellSize = mainGrid.CellSize;
             gridCenter = mainGrid.GridCenterPosition;
+            halfWidth = mainGrid.TotalGridWidth / 2f;
         }
 
         StartCoroutine(InitializeIterationSystem());
@@ -84,13 +92,6 @@ public class IterationManager : MonoBehaviour
 
     private void ReturnToIteration2(int parentProbeIndex)
     {
-        HideIteration1Probes();
-
-        if (focusSystem != null && focusSystem.focusSystemEnabled)
-        {
-            focusSystem.ExitFocusMode();
-        }
-
         GameObject parentProbe = iterationProbes[1][parentProbeIndex];
         if (parentProbe == null || gridRebuildManager == null)
         {
@@ -106,8 +107,23 @@ public class IterationManager : MonoBehaviour
         int parentRow = parentGridIndex.y;
         int parentCol = parentGridIndex.x;
 
+        HideIteration1ProbesExcept(parentProbe);
+
+        UpdateProbeInfluenceRadius(parentProbe, 1);
+
         List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex];
         Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex];
+
+        Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol);
+        parentDeformedPosition.z = gridCenter.z - 0.15f;
+        parentProbe.transform.position = parentDeformedPosition;
+
+        parentProbe.SetActive(true);
+        Renderer parentRenderer = parentProbe.GetComponent<Renderer>();
+        if (parentRenderer != null)
+        {
+            parentRenderer.enabled = true;
+        }
 
         foreach (GameObject probe in iteration2Probes)
         {
@@ -134,8 +150,17 @@ public class IterationManager : MonoBehaviour
             }
         }
 
-        probeDots.probes = new List<GameObject>(iteration2Probes);
-        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(iteration2Positions);
+        List<GameObject> allIteration2Probes = new List<GameObject>(iteration2Probes);
+        allIteration2Probes.Add(parentProbe);
+
+        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(iteration2Positions);
+        if (gridRebuildManager.probeOriginalPositions.ContainsKey(parentProbe))
+        {
+            allIteration2Positions[parentProbe] = gridRebuildManager.probeOriginalPositions[parentProbe];
+        }
+
+        probeDots.probes = allIteration2Probes;
+        probeDots.probeInitialPositions = allIteration2Positions;
         probeDots.selectedProbeIndex = -1;
 
         currentIteration = 2;
@@ -168,12 +193,9 @@ public class IterationManager : MonoBehaviour
 
         Vector3 newCenterPosition = selectedProbe.transform.position;
 
-        HideIteration1Probes();
+        HideIteration1ProbesExcept(selectedProbe);
 
-        if (focusSystem != null && focusSystem.focusSystemEnabled)
-        {
-            focusSystem.ExitFocusMode();
-        }
+        UpdateProbeInfluenceRadius(selectedProbe, 1);
 
         if (iterationFixationPoints.ContainsKey(1))
         {
@@ -215,6 +237,7 @@ public class IterationManager : MonoBehaviour
 
         if (!gridRebuildManager.probeGridIndices.ContainsKey(selectedProbe))
         {
+            Debug.LogError($"Parent probe not found in probeGridIndices!");
             return;
         }
 
@@ -226,14 +249,14 @@ public class IterationManager : MonoBehaviour
 
         Vector2Int[] neighborOffsets = new Vector2Int[]
         {
-            new Vector2Int(-1, -1),
+            new Vector2Int(-1, -1), 
             new Vector2Int(0, -1),  
             new Vector2Int(1, -1),  
             new Vector2Int(-1, 0),  
             new Vector2Int(1, 0),   
             new Vector2Int(-1, 1),  
             new Vector2Int(0, 1),   
-            new Vector2Int(1, 1)   
+            new Vector2Int(1, 1)    
         };
 
         int probeCounter = 0;
@@ -284,18 +307,32 @@ public class IterationManager : MonoBehaviour
         parentProbeToIteration2Probes[parentProbeIndex] = newIteration2Probes;
         parentProbeToIteration2Positions[parentProbeIndex] = newIteration2Positions;
 
-        probeDots.probes = new List<GameObject>(newIteration2Probes);
-        probeDots.probeInitialPositions = new Dictionary<GameObject, Vector3>(newIteration2Positions);
+        List<GameObject> allIteration2Probes = new List<GameObject>(newIteration2Probes);
+        allIteration2Probes.Add(selectedProbe);
+
+        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(newIteration2Positions);
+        if (gridRebuildManager.probeOriginalPositions.ContainsKey(selectedProbe))
+        {
+            allIteration2Positions[selectedProbe] = gridRebuildManager.probeOriginalPositions[selectedProbe];
+        }
+
+        probeDots.probes = allIteration2Probes;
+        probeDots.probeInitialPositions = allIteration2Positions;
         probeDots.selectedProbeIndex = -1;
     }
 
     private void HideIteration1Probes()
     {
+        HideIteration1ProbesExcept(null);
+    }
+
+    private void HideIteration1ProbesExcept(GameObject exceptProbe)
+    {
         if (iterationProbes.ContainsKey(1))
         {
             foreach (GameObject probe in iterationProbes[1])
             {
-                if (probe != null)
+                if (probe != null && probe != exceptProbe)
                 {
                     Renderer renderer = probe.GetComponent<Renderer>();
                     if (renderer != null)
@@ -344,6 +381,8 @@ public class IterationManager : MonoBehaviour
                     {
                         renderer.enabled = true;
                     }
+
+                    UpdateProbeInfluenceRadius(probe, 2);
                 }
             }
         }
@@ -388,7 +427,18 @@ public class IterationManager : MonoBehaviour
 
     public bool HasIteration2ForProbe(int probeIndex)
     {
-        return parentProbeToIteration2Probes.ContainsKey(probeIndex) && 
+        return parentProbeToIteration2Probes.ContainsKey(probeIndex) &&
                parentProbeToIteration2Probes[probeIndex].Count > 0;
+    }
+
+    private void UpdateProbeInfluenceRadius(GameObject probe, int radius)
+    {
+        if (gridRebuildManager != null && probe != null)
+        {
+            if (gridRebuildManager.probeInfluenceRadius.ContainsKey(probe))
+            {
+                gridRebuildManager.probeInfluenceRadius[probe] = radius;
+            }
+        }
     }
 }

@@ -26,7 +26,7 @@ public class GridRebuildManager : MonoBehaviour
 
     public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
     private List<GameObject> allProbes = new List<GameObject>();
-    private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
+    public Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
     public Dictionary<GameObject, Vector2Int> probeGridIndices = new Dictionary<GameObject, Vector2Int>();
 
     private float lineWidth = 0.15f;
@@ -79,7 +79,6 @@ public class GridRebuildManager : MonoBehaviour
         needsRebuild = true;
         RebuildGrid();
 
-        // Ensure center fixation point remains visible
         if (centerFixationPoint != null)
         {
             Renderer renderer = centerFixationPoint.GetComponent<Renderer>();
