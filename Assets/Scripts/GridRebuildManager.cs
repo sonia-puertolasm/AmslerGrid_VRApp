@@ -167,7 +167,7 @@ public class GridRebuildManager : MonoBehaviour
         lr.startColor = lineColor;
         lr.endColor = lineColor;
         lr.positionCount = pointCount;
-        lr.useWorldSpace = true;
+        lr.useWorldSpace = false;
     }
 
     private bool CheckProbesMoved()

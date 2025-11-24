@@ -188,7 +188,7 @@ public class MainGrid : MonoBehaviour
         lineRenderer.endColor = lineColor;
         lineRenderer.startWidth = lineWidth;
         lineRenderer.endWidth = lineWidth;
-        lineRenderer.useWorldSpace = true; // Use world space coordinates
+        lineRenderer.useWorldSpace = false; // Use world space coordinates
         lineRenderer.numCapVertices = 5; // Rounded line caps
         lineRenderer.numCornerVertices = 5; // Rounded line corners
         lineRenderer.positionCount = 2; // Two points for the line
