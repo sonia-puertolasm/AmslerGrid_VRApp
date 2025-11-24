@@ -15,11 +15,9 @@ public class MainGrid : MonoBehaviour
     private float centerDotSize = 0.3f;
     private Color centerDotColor = Color.red;
 
-    public Vector3 gridCenterPosition = Vector3.zero;
+    internal Vector3 gridCenterPosition = Vector3.zero;
 
-    // Definition of storage for grid lines and points
-    private List<GameObject> allLines = new List<GameObject>();
-    private GameObject centerDot;
+    // Definition of storage for grid points
 
     // Store all grid intersection points
     private GameObject[,] gridPoints;
@@ -43,7 +41,7 @@ public class MainGrid : MonoBehaviour
         SetupCamera();
     }
 
-    // FUNCTION: Camera setup to ensure full grid visibility
+    // FUNCTION: Camera setup in perspective mode to ensure full grid visibility
     private void SetupCamera()
     {
         Camera cam = Camera.main;
@@ -52,18 +50,31 @@ public class MainGrid : MonoBehaviour
             return;
         }
 
-        cam.transform.position = new Vector3(gridCenterPosition.x, gridCenterPosition.y, -10f);
-        cam.transform.rotation = Quaternion.identity;
-
-        cam.orthographic = true;
-        cam.orthographicSize = (totalGridWidth / 2f) * 1.2f;
-
+        cam.orthographic = false;
         cam.backgroundColor = Color.black;
-
-        cam.nearClipPlane = 0.3f;
+        cam.nearClipPlane = 0.1f;
         cam.farClipPlane = 1000f;
+        cam.fieldOfView = 60f;
+        
+        float margin = 1.05f;
+        float gridWidth = totalGridWidth * margin;
+        float gridHeight = totalGridWidth * margin;
 
-        cam.cullingMask = -1;
+        float vFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float aspect = cam.aspect;
+
+        float hFovRad = 2f * Mathf.Atan(Mathf.Tan(vFovRad / 2f) * aspect);
+
+        float distForHeight = (gridHeight * 0.5f) / Mathf.Tan(vFovRad / 2f);
+        float distForWidth = (gridWidth * 0.5f) / Mathf.Tan(hFovRad / 2f);
+
+        float requiredDistance = Mathf.Max(distForHeight, distForWidth);
+
+        cam.transform.position = new Vector3(gridCenterPosition.x, gridCenterPosition.y, gridCenterPosition.z - requiredDistance);
+        cam.transform.rotation = Quaternion.identity;
+        cam.transform.LookAt(gridCenterPosition);
+
+        cam.transform.position += new Vector3(0, 0, -0.5f);
     }
 
     // FUNCTION: Creation of grid intersection points as invisible spheres
@@ -185,9 +196,6 @@ public class MainGrid : MonoBehaviour
         // Set the start and end positions of the line
         lineRenderer.SetPosition(0, start);
         lineRenderer.SetPosition(1, end);
-
-        // Store the line GameObject in the list for future reference
-        allLines.Add(lineObj);
     }
 
     // FUNCTION: Setup of the center fixation point in the middle of the grid
@@ -208,8 +216,6 @@ public class MainGrid : MonoBehaviour
         pointData.isCenterFixation = true; // Mark as center fixation point
 
         centerGridPoint.name = "CenterFixationPoint"; // Rename for posterior identification
-
-        centerDot = centerGridPoint; // Store reference to the center dot
     }
 }
 

@@ -15,13 +15,11 @@ public class GridRebuildManager : MonoBehaviour
     private Vector3[,] originalGridPoints;
     private Vector3[,] currentGridPoints;
     
-    // This is the ONLY source of truth for deformation
     private Vector3[,] accumulatedDisplacement;
+    internal List<LineRenderer> horizontalLinePool = new List<LineRenderer>();
+    internal List<LineRenderer> verticalLinePool = new List<LineRenderer>();
 
-    public List<LineRenderer> horizontalLinePool = new List<LineRenderer>();
-    public List<LineRenderer> verticalLinePool = new List<LineRenderer>();
-
-    public bool enableDeformation = true;
+    internal bool enableDeformation = true;
 
     private bool needsRebuild = false;
     private Vector3[] lastProbePositions;
@@ -29,7 +27,7 @@ public class GridRebuildManager : MonoBehaviour
     public Dictionary<GameObject, Vector3> probeOriginalPositions = new Dictionary<GameObject, Vector3>();
     private List<GameObject> allProbes = new List<GameObject>();
     private Dictionary<GameObject, int> probeInfluenceRadius = new Dictionary<GameObject, int>();
-    private Dictionary<GameObject, Vector2Int> probeGridIndices = new Dictionary<GameObject, Vector2Int>();
+    public Dictionary<GameObject, Vector2Int> probeGridIndices = new Dictionary<GameObject, Vector2Int>();
 
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
@@ -80,6 +78,16 @@ public class GridRebuildManager : MonoBehaviour
 
         needsRebuild = true;
         RebuildGrid();
+
+        // Ensure center fixation point remains visible
+        if (centerFixationPoint != null)
+        {
+            Renderer renderer = centerFixationPoint.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = true;
+            }
+        }
     }
 
     void LateUpdate()
@@ -204,21 +212,16 @@ public class GridRebuildManager : MonoBehaviour
 
     private void RebuildGrid()
     {
-        // Step 1: Calculate NEW displacement contributions from currently moving probe
         CalculateDisplacementContributions();
         
-        // Step 2: Apply accumulated displacement to get current grid
         ApplyAccumulatedDisplacement();
 
-        // Step 3: Update line renderers
         UpdateHorizontalLines();
         UpdateVerticalLines();
         
-        // Step 4: Update ALL probe positions to follow their grid points
         UpdateAllProbesToGrid();
     }
 
-    // This calculates the displacement contribution from the currently selected/moving probe
     private void CalculateDisplacementContributions()
     {
         if (probeDots == null || probeDots.selectedProbeIndex < 0)
@@ -233,17 +236,14 @@ public class GridRebuildManager : MonoBehaviour
         Vector3 probeCurrentPos = selectedProbe.transform.position;
         Vector3 probeOriginalPos = GetProbeOriginalPosition(selectedProbe);
         
-        // Calculate how much THIS probe has moved from its original position
         Vector3 totalProbeDisplacement = probeCurrentPos - probeOriginalPos;
         
-        // Calculate how much the grid point where this probe sits has already been displaced
         Vector2Int probeGridIndex = GetProbeGridIndex(selectedProbe);
         int probeRow = probeGridIndex.y;
         int probeCol = probeGridIndex.x;
         
         Vector3 gridPointCurrentDisplacement = accumulatedDisplacement[probeRow, probeCol];
         
-        // The NEW displacement this probe is adding is the difference
         Vector3 newDisplacementFromProbe = totalProbeDisplacement - gridPointCurrentDisplacement;
 
         if (newDisplacementFromProbe.magnitude < 0.001f)
@@ -269,11 +269,9 @@ public class GridRebuildManager : MonoBehaviour
         {
             for (int col = minCol; col <= maxCol; col++)
             {
-                // Skip boundary points
                 if (row == 0 || row == gridSize || col == 0 || col == gridSize)
                     continue;
 
-                // Skip center fixation
                 if (IsCenterFixationAtGridPoint(row, col))
                     continue;
 
@@ -284,7 +282,6 @@ public class GridRebuildManager : MonoBehaviour
                 float rowWeight = CalculateAdaptiveWeight(deltaRow, -downLimit, upLimit);
                 float combinedWeight = colWeight * rowWeight;
 
-                // ADD to accumulated displacement (accumulative)
                 accumulatedDisplacement[row, col] += newDisplacementFromProbe * combinedWeight;
             }
         }
@@ -303,7 +300,6 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
-    // This updates ALL probes (both iteration 1 and iteration 2) to follow their grid points
     private void UpdateAllProbesToGrid()
     {
         if (probeDots == null)
@@ -314,7 +310,6 @@ public class GridRebuildManager : MonoBehaviour
             if (probe == null || !probe.activeInHierarchy)
                 continue;
 
-            // Don't move the probe that's currently being dragged by the user
             int probeIndex = probeDots.probes.IndexOf(probe);
             if (probeIndex == probeDots.selectedProbeIndex)
                 continue;
@@ -327,12 +322,10 @@ public class GridRebuildManager : MonoBehaviour
             if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
                 continue;
             
-            // Get the deformed position of this grid point
             Vector3 deformedPos = currentGridPoints[gridIndex.y, gridIndex.x];
             float probeZ = gridCenter.z - 0.15f;
             deformedPos.z = probeZ;
             
-            // Move the probe to follow the grid
             probe.transform.position = deformedPos;
         }
     }

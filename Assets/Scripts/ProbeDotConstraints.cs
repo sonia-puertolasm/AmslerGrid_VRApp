@@ -9,18 +9,18 @@ public class ProbeDotConstraints : MonoBehaviour
 {
     private MainGrid mainGrid;
 
-    public float boundaryPadding = 0.1f;
+    internal float boundaryPadding = 0.1f;
     private float cellSize;
-    public float overlapBuffer = 0.25f;
+    internal float overlapBuffer = 0.25f;
     
-    public float maxDisplacementFactor = 0.8f;
+    internal float maxDisplacementFactor = 0.8f;
 
     private float minX, maxX, minY, maxY;
 
-    public float MinX => minX;
-    public float MaxX => maxX;
-    public float MinY => minY;
-    public float MaxY => maxY;
+    private float MinX => minX;
+    private float MaxX => maxX;
+    private float MinY => minY;
+    private float MaxY => maxY;
 
     void Start()
     {

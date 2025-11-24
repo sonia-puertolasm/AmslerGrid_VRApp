@@ -4,19 +4,16 @@ using UnityEngine;
 
 public class DisplacementTracker : MonoBehaviour
 {
-    // Definition of references to main grid
+    // Definition of references needed for displacement tracking
     private ProbeDots probeDots;
-    private MainGrid mainGrid;
-    private GridRebuildManager gridRebuildManager;
 
     // Definition of empty list for displacement data
     private List<IterationDisplacementData> iterationHistory = new List<IterationDisplacementData>();
 
-    private bool isInitialized = false;
-
     // Live displacement tracking
     private Dictionary<int, ProbeDisplacement> currentLiveDisplacements = new Dictionary<int, ProbeDisplacement>();
     private bool liveUpdateEnabled = true;
+    private bool isInitialized = false;
 
     // Definition of iteration displacement data
     public class IterationDisplacementData
@@ -91,17 +88,10 @@ public class DisplacementTracker : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
-        // Retrieve GO elements from other scripts
+        // Retrieve only required elements
         probeDots = FindObjectOfType<ProbeDots>();
-        mainGrid = FindObjectOfType<MainGrid>();
-        gridRebuildManager = FindObjectOfType<GridRebuildManager>();
 
         if (probeDots == null || probeDots.probes == null || probeDots.probes.Count == 0) // Safety: avoid action in case probe dots are not existing
-        {
-            yield break;
-        }
-
-        if (mainGrid == null) // Safety: avoid action in case grid is not existing
         {
             yield break;
         }
