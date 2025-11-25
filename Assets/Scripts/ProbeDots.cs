@@ -9,6 +9,7 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
+    private IterationManager iterationManager;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     internal float probeDotSize = 0.2f; // Size of each probe dot
@@ -28,13 +29,14 @@ public class ProbeDots : MonoBehaviour
     // Initialization of all probe dot functionalities
     void Start()
     {
-        if (mainGrid == null) // Ensure mainGrid reference is set
+        mainGrid = FindObjectOfType<MainGrid>();
+
+        // Define GO in reference to mainGrid
+        if (mainGrid != null)
         {
-            mainGrid = FindObjectOfType<MainGrid>();
-            if (mainGrid == null) // Try to find the MainGrid component. If not found, exit.
-            {
-                return;
-            }
+            transform.position = mainGrid.transform.position;
+            transform.rotation = mainGrid.transform.rotation;
+            transform.localScale = mainGrid.transform.localScale;
         }
 
         // Initialize or find the constraints component
@@ -46,6 +48,9 @@ public class ProbeDots : MonoBehaviour
 
         // Initialize focus system reference
         focusSystem = FindObjectOfType<FocusSystem>();
+
+        // Initialize iteration manager reference
+        iterationManager = FindObjectOfType<IterationManager>();
 
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
@@ -65,7 +70,7 @@ public class ProbeDots : MonoBehaviour
 
     void Update() // Update is called once per frame
     {
-        HandleProbeSelection();
+        HandleKeyboardProbeSelection();
         HandleProbeMovement();
         HandleKeys();
     }
@@ -146,25 +151,59 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // FUNCTION: Handle probe selection via mouse click
-    private void HandleProbeSelection()
+    // FUNCTION: Handle probe selection via numerical pad keyboard (1-9)
+    private void HandleKeyboardProbeSelection()
     {
-        if (Input.GetMouseButtonDown(0))
+        KeyCode[] numpadKeys = new KeyCode[]
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
+            KeyCode.Keypad1, KeyCode.Keypad2, KeyCode.Keypad3,
+            KeyCode.Keypad4, KeyCode.Keypad5, KeyCode.Keypad6,
+            KeyCode.Keypad7, KeyCode.Keypad8, KeyCode.Keypad9
+        };
 
-            if (Physics.Raycast(ray, out hit))
+        KeyCode[] alphaKeys = new KeyCode[]
+        {
+            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
+            KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
+            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9
+        };
+
+        bool isIteration2 = (iterationManager != null && iterationManager.CurrentIteration == 2);
+
+        for (int keyIndex = 0; keyIndex < 9; keyIndex++)
+        {
+            bool keyPressed = Input.GetKeyDown(numpadKeys[keyIndex]) || Input.GetKeyDown(alphaKeys[keyIndex]);
+
+            if (keyPressed)
             {
-                for (int i = 0; i < probes.Count; i++)
+                if (!isIteration2 && keyIndex == 4)
                 {
-                    if (hit.collider.gameObject == probes[i])
-                    {
-                        SelectProbe(i);
-                        return;
-                    }
+                    continue;
+                }
+
+                int probeIndex = GetProbeIndexFromKeyPosition(keyIndex, isIteration2);
+
+                if (probeIndex >= 0 && probeIndex < probes.Count)
+                {
+                    SelectProbe(probeIndex);
+                    return;
                 }
             }
+        }
+    }
+
+    // HELPER FUNCTION: Map keyboard position (0-8) to probe index based on iteration
+    private int GetProbeIndexFromKeyPosition(int keyPosition, bool isIteration2)
+    {
+        if (isIteration2)
+        {
+            int[] keyToProbeMap = { 0, 1, 2, 3, 8, 4, 5, 6, 7 };
+            return keyToProbeMap[keyPosition];
+        }
+        else
+        {
+            int[] keyToProbeMap = { 0, 1, 2, 3, -1, 4, 5, 6, 7 };
+            return keyToProbeMap[keyPosition];
         }
     }
 

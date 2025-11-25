@@ -38,6 +38,10 @@ public class IterationManager : MonoBehaviour
             cellSize = mainGrid.CellSize;
             gridCenter = mainGrid.GridCenterPosition;
             halfWidth = mainGrid.TotalGridWidth / 2f;
+
+            transform.position = mainGrid.transform.position;
+            transform.rotation = mainGrid.transform.rotation;
+            transform.localScale = mainGrid.transform.localScale;
         }
 
         StartCoroutine(InitializeIterationSystem());
@@ -114,9 +118,10 @@ public class IterationManager : MonoBehaviour
         List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex];
         Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex];
 
-        Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol);
-        parentDeformedPosition.z = gridCenter.z - 0.15f;
-        parentProbe.transform.position = parentDeformedPosition;
+        // Get deformed position in local space and convert to world space
+        Vector3 parentDeformedLocalPos = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol);
+        parentDeformedLocalPos.z = -0.15f; // Probe Z offset in local space
+        parentProbe.transform.position = gridRebuildManager.transform.TransformPoint(parentDeformedLocalPos);
 
         parentProbe.SetActive(true);
         Renderer parentRenderer = parentProbe.GetComponent<Renderer>();
@@ -135,10 +140,11 @@ public class IterationManager : MonoBehaviour
                     int probeRow = probeGridIndex.y;
                     int probeCol = probeGridIndex.x;
 
-                    Vector3 deformedPosition = gridRebuildManager.GetDeformedGridPoint(probeRow, probeCol);
-                    deformedPosition.z = gridCenter.z - 0.15f;
+                    // Get deformed position in local space and convert to world space
+                    Vector3 deformedLocalPos = gridRebuildManager.GetDeformedGridPoint(probeRow, probeCol);
+                    deformedLocalPos.z = -0.15f; // Probe Z offset in local space
 
-                    probe.transform.position = deformedPosition;
+                    probe.transform.position = gridRebuildManager.transform.TransformPoint(deformedLocalPos);
                 }
 
                 probe.SetActive(true);
@@ -272,9 +278,10 @@ public class IterationManager : MonoBehaviour
                 continue;
             }
 
-            Vector3 gridPosition = gridRebuildManager.GetDeformedGridPoint(newRow, newCol);
-            
-            gridPosition.z = gridCenter.z - 0.15f;
+            // Get deformed position in local space and convert to world space
+            Vector3 gridLocalPos = gridRebuildManager.GetDeformedGridPoint(newRow, newCol);
+            gridLocalPos.z = -0.15f; // Probe Z offset in local space
+            Vector3 gridPosition = gridRebuildManager.transform.TransformPoint(gridLocalPos);
 
             GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             probe.name = $"ProbePoint_Parent{parentProbeIndex}_Iteration2_{probeCounter}";
@@ -292,8 +299,10 @@ public class IterationManager : MonoBehaviour
             GridPointData pointData = probe.AddComponent<GridPointData>();
             pointData.isInteractable = true;
 
-            Vector3 originalPosition = gridRebuildManager.GetOriginalGridPoint(newRow, newCol);
-            originalPosition.z = gridCenter.z - 0.15f;
+            // Get original position in local space and convert to world space
+            Vector3 originalLocalPos = gridRebuildManager.GetOriginalGridPoint(newRow, newCol);
+            originalLocalPos.z = -0.15f; // Probe Z offset in local space
+            Vector3 originalPosition = gridRebuildManager.transform.TransformPoint(originalLocalPos);
             
             newIteration2Positions[probe] = originalPosition;
             newIteration2Probes.Add(probe);
