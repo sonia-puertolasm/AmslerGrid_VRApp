@@ -9,16 +9,18 @@ public class ProbeDotConstraints : MonoBehaviour
 {
     private MainGrid mainGrid;
 
-    public float boundaryPadding = 0.1f;
+    internal float boundaryPadding = 0.1f;
     private float cellSize;
-    public float overlapBuffer = 0.15f;
+    internal float overlapBuffer = 0.25f;
+    
+    internal float maxDisplacementFactor = 0.8f;
 
     private float minX, maxX, minY, maxY;
 
-    public float MinX => minX;
-    public float MaxX => maxX;
-    public float MinY => minY;
-    public float MaxY => maxY;
+    private float MinX => minX;
+    private float MaxX => maxX;
+    private float MinY => minY;
+    private float MaxY => maxY;
 
     void Start()
     {
@@ -47,6 +49,8 @@ public class ProbeDotConstraints : MonoBehaviour
     {
         Vector3 constrainedPos = proposedPosition;
 
+        constrainedPos = ConstrainToMaxDisplacement(constrainedPos, initialPosition);
+
         if (neighborPositions != null && neighborPositions.Count > 0)
         {
             constrainedPos = ConstrainToNeighbors(constrainedPos, neighborPositions, currentPosition, initialPosition);
@@ -55,6 +59,21 @@ public class ProbeDotConstraints : MonoBehaviour
         constrainedPos = ConstrainToBoundary(constrainedPos, currentPosition);
 
         return constrainedPos;
+    }
+
+    private Vector3 ConstrainToMaxDisplacement(Vector3 proposedPos, Vector3 initialPos)
+    {
+        float maxDisplacement = cellSize * maxDisplacementFactor;
+        
+        Vector3 displacement = proposedPos - initialPos;
+        
+        if (displacement.magnitude > maxDisplacement)
+        {
+            displacement = displacement.normalized * maxDisplacement;
+            return initialPos + displacement;
+        }
+        
+        return proposedPos;
     }
 
     public Vector3 ApplyFocusAreaConstraints(Vector3 proposedPosition, Vector3 focusMinBounds, Vector3 focusMaxBounds)

@@ -7,15 +7,14 @@ public class FocusSystem : MonoBehaviour
     // Definition of grid configuration specific parameters
     private ProbeDots probeDots;
     private GridRebuildManager gridRebuildManager;
+    private IterationManager iterationManager;
     private GameObject centerFixationPoint;
-     private int gridSize;
-    private float cellSize;
+    private int gridSize;
     private Vector3 gridCenter;
-    private float halfWidth;
 
     // Definition of focus mode specific parameters
     private bool isInFocusMode = false;
-    public bool focusSystemEnabled = false;
+    internal bool focusSystemEnabled = false;
     private int focusRadius = 2; // Will be set dynamically based on probe iteration
 
     // Definition of dictionary for the visibility of the probes
@@ -24,13 +23,6 @@ public class FocusSystem : MonoBehaviour
     // Definition of dictionary for the line segments to be shown while in focus mode
     private List<FocusLineSegment> focusModeLineSegments = new List<FocusLineSegment>();
     
-    // Definition of parameters for the focus mode when updated
-    private int currentFocusMinCol = 0;
-    private int currentFocusMaxCol = 0;
-    private int currentFocusMinRow = 0;
-    private int currentFocusMaxRow = 0;
-    private int currentFocusProbeIndex = -1;
-
     // Declaration of the segment of lines to be defined while in focus mode
     private class FocusLineSegment
     {
@@ -57,6 +49,7 @@ public class FocusSystem : MonoBehaviour
     {
         probeDots = FindObjectOfType<ProbeDots>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
+        iterationManager = FindObjectOfType<IterationManager>();
         centerFixationPoint = GameObject.Find("CenterFixationPoint");
 
         MainGrid mainGrid = FindObjectOfType<MainGrid>();
@@ -64,10 +57,11 @@ public class FocusSystem : MonoBehaviour
         if (mainGrid != null) // Safety: ensures that the parameters are defined ONLY when the Amsler Grid exists
         {
             gridSize = mainGrid.GridSize;
-            cellSize = mainGrid.CellSize;
             gridCenter = mainGrid.GridCenterPosition;
-            halfWidth = mainGrid.TotalGridWidth / 2f;
         }
+
+        // Enable the focus system
+        focusSystemEnabled = true;
     }
 
     // Callback method for every frame
@@ -105,9 +99,7 @@ public class FocusSystem : MonoBehaviour
     private void EnterFocusMode(int probeIndex)
     {
         isInFocusMode = true;
-        currentFocusProbeIndex = probeIndex;
         
-        // Set focus radius based on probe's iteration level
         // Get the selected probe GameObject
         if (probeDots != null && probeIndex >= 0 && probeIndex < probeDots.probes.Count)
         {
@@ -141,7 +133,6 @@ public class FocusSystem : MonoBehaviour
         }
 
         isInFocusMode = false;
-        currentFocusProbeIndex = -1;
 
         RestoreAllLines();
         RestoreProbeVisibility();
@@ -161,7 +152,7 @@ public class FocusSystem : MonoBehaviour
         if (selectedProbe == null) // Safety: exit in case of no selected probe
             return;
 
-        //Definition of probe grid position in x-axis and y-axis    
+        //Definition of probe grid position in x-axis and y-axis
         Vector2Int probeGridPos = GetProbeGridIndex(selectedProbe);
         int probeRow = probeGridPos.y;
         int probeCol = probeGridPos.x;
@@ -180,11 +171,14 @@ public class FocusSystem : MonoBehaviour
                 lr.enabled = false;
         }
 
+        // Determine focus radius based on current iteration (2x2x2x2 for iteration 1, 1x1x1x1 for higher iterations)
+        int currentFocusRadius = (iterationManager != null && iterationManager.CurrentIteration > 1) ? 1 : focusRadius;
+
         // Definition of min and max ranges of column and row for focus mode of probe of interest
-        currentFocusMinCol = Mathf.Max(0, probeCol - focusRadius);
-        currentFocusMaxCol = Mathf.Min(gridSize, probeCol + focusRadius);
-        currentFocusMinRow = Mathf.Max(0, probeRow - focusRadius);
-        currentFocusMaxRow = Mathf.Min(gridSize, probeRow + focusRadius);
+        int focusMinCol = Mathf.Max(0, probeCol - currentFocusRadius);
+        int focusMaxCol = Mathf.Min(gridSize, probeCol + currentFocusRadius);
+        int focusMinRow = Mathf.Max(0, probeRow - currentFocusRadius);
+        int focusMaxRow = Mathf.Min(gridSize, probeRow + currentFocusRadius);
 
         // Showing of only vertical and horizontal lines that go through the selected probe dot
         if (probeRow >= 0 && probeRow < gridRebuildManager.horizontalLinePool.Count)
@@ -192,7 +186,7 @@ public class FocusSystem : MonoBehaviour
             LineRenderer horizontalLine = gridRebuildManager.horizontalLinePool[probeRow]; // Obtanining of specific horizontal line
             if (horizontalLine != null) // Safety: ensure that the horizontal line exists
             {
-                CreateLineSegment(horizontalLine, currentFocusMinCol, currentFocusMaxCol,
+                CreateLineSegment(horizontalLine, focusMinCol, focusMaxCol,
                                 $"Horizontal_Row{probeRow}", true); // Display specific segment of the original rendered line
             }
         }
@@ -202,7 +196,7 @@ public class FocusSystem : MonoBehaviour
             LineRenderer verticalLine = gridRebuildManager.verticalLinePool[probeCol]; // Obtanining of specific vertical line
             if (verticalLine != null) // Safety: ensure that the vertical line exists
             {
-                CreateLineSegment(verticalLine, currentFocusMinRow, currentFocusMaxRow,
+                CreateLineSegment(verticalLine, focusMinRow, focusMaxRow,
                                 $"Vertical_Col{probeCol}", false); // Display specific segment of the original rendered line
             }
         }

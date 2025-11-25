@@ -9,22 +9,20 @@ public class ProbeDots : MonoBehaviour
     private MainGrid mainGrid;
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
-    // Note: Grid deformation now handled automatically by GridRebuildManager
 
     // Definition of configuration parameters for probe dots (they were previously generated)
-    public float probeDotSize = 0.2f; // Size of each probe dot
-    public float moveSpeed = 2f; // Speed of probe movement
-    public float probeSpacing = 0f; // Spacing between probes
+    internal float probeDotSize = 0.2f; // Size of each probe dot
+    internal float moveSpeed = 2f; // Speed of probe movement
+    internal float probeSpacing = 0f; // Spacing between probes
 
-    public List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
-    public Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
-    public int selectedProbeIndex = -1; // Index of the currently selected probe
+    internal List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
+    internal Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
+    internal int selectedProbeIndex = -1; // Index of the currently selected probe
 
     // Neighbor tracking for constraint application
     private Dictionary<int, List<int>> probeNeighbors = new Dictionary<int, List<int>>(); // Maps probe index to its neighbor indices
 
     // Variables for movement tracking
-    private Vector3 movementStartPosition; // Position at the beginning of the movement
     private bool isMoving = false; // Tracking about movement of probe
 
     // Initialization of all probe dot functionalities
@@ -212,7 +210,6 @@ public class ProbeDots : MonoBehaviour
             if (!isMoving)
             {
                 isMoving = true;
-                movementStartPosition = currentPosition;
             }
 
             // Normalize input direction to prevent faster diagonal movement

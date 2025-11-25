@@ -4,14 +4,15 @@ using UnityEngine;
 
 public class DisplacementTracker : MonoBehaviour
 {
-    // Definition of references to main grid
+    // Definition of references needed for displacement tracking
     private ProbeDots probeDots;
-    private MainGrid mainGrid;
-    private GridRebuildManager gridRebuildManager;
 
     // Definition of empty list for displacement data
     private List<IterationDisplacementData> iterationHistory = new List<IterationDisplacementData>();
 
+    // Live displacement tracking
+    private Dictionary<int, ProbeDisplacement> currentLiveDisplacements = new Dictionary<int, ProbeDisplacement>();
+    private bool liveUpdateEnabled = true;
     private bool isInitialized = false;
 
     // Definition of iteration displacement data
@@ -38,7 +39,6 @@ public class DisplacementTracker : MonoBehaviour
         public Vector3 displacementVector3D;
         public float displacementMagnitude;
 
-        //
         public ProbeDisplacement(int index, Vector3 origPos, Vector3 currPos)
         {
             probeIndex = index; // Probe's index
@@ -57,22 +57,41 @@ public class DisplacementTracker : MonoBehaviour
         StartCoroutine(InitializeTracker());
     }
 
+    // Live update of displacement tracking every frame
+    private void LateUpdate()
+    {
+        if (!isInitialized || !liveUpdateEnabled || probeDots == null)
+        {
+            return;
+        }
+
+        UpdateLiveDisplacements();
+    }
+
+    // FUNCTION: Updates the live displacement dictionary with current probe positions
+    private void UpdateLiveDisplacements()
+    {
+        currentLiveDisplacements.Clear();
+
+        for (int i = 0; i < probeDots.probes.Count; i++)
+        {
+            ProbeDisplacement displacement = GetProbeDisplacement(i);
+            if (displacement != null)
+            {
+                currentLiveDisplacements[i] = displacement;
+            }
+        }
+    }
+
     // Coroutine to initialize tracking of displacement until after grid is generated  -> allows method to pause and resume
     private IEnumerator InitializeTracker()
     {
         yield return new WaitForEndOfFrame();
 
-        // Retrieve GO elements from other scripts
+        // Retrieve only required elements
         probeDots = FindObjectOfType<ProbeDots>();
-        mainGrid = FindObjectOfType<MainGrid>();
-        gridRebuildManager = FindObjectOfType<GridRebuildManager>();
 
         if (probeDots == null || probeDots.probes == null || probeDots.probes.Count == 0) // Safety: avoid action in case probe dots are not existing
-        {
-            yield break;
-        }
-
-        if (mainGrid == null) // Safety: avoid action in case grid is not existing
         {
             yield break;
         }
@@ -147,6 +166,27 @@ public class DisplacementTracker : MonoBehaviour
         return allDisplacements;
     }
 
+    // FUNCTION: Returns the current live displacement dictionary (updated every frame)
+    public Dictionary<int, ProbeDisplacement> GetLiveDisplacements()
+    {
+        if (!isInitialized)
+        {
+            return new Dictionary<int, ProbeDisplacement>();
+        }
+
+        return new Dictionary<int, ProbeDisplacement>(currentLiveDisplacements);
+    }
+
+    // FUNCTION: Get live displacement for a specific probe index
+    public ProbeDisplacement GetLiveDisplacement(int probeIndex)
+    {
+        if (currentLiveDisplacements.ContainsKey(probeIndex))
+        {
+            return currentLiveDisplacements[probeIndex];
+        }
+        return null;
+    }
+
     // HELPER FUNCTION: Determines whether a probe dot has moved (or not)
     public bool HasProbeMoved(int probeIndex, float threshold = 0.01f)
     {
@@ -216,7 +256,14 @@ public class DisplacementTracker : MonoBehaviour
         ClearIterationHistory();
     }
 
-    // Defined variables for further use
+    // FUNCTION: Enable or disable live update mode
+    public void SetLiveUpdateMode(bool enabled)
+    {
+        liveUpdateEnabled = enabled;
+    }
+
+    // Definition of variables for further use
     public bool IsInitialized => isInitialized; // Initialization status
     public int ProbeCount => probeDots != null ? probeDots.probes.Count : 0; // Returns how many probe dots is there as long as there is any number except 0
+    public bool LiveUpdateEnabled => liveUpdateEnabled; // Live update status
 }
