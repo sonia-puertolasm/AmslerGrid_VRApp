@@ -43,13 +43,6 @@ public class GridRebuildManager : MonoBehaviour
             return;
         }
 
-        if (mainGrid != null)
-        {
-            transform.position = mainGrid.transform.position;
-            transform.rotation = mainGrid.transform.rotation;
-            transform.localScale = mainGrid.transform.localScale;
-        }
-
         StartCoroutine(InitializeSystem());
     }
 
@@ -324,14 +317,14 @@ public class GridRebuildManager : MonoBehaviour
                 continue;
 
             Vector2Int gridIndex = probeGridIndices[probe];
-
+            
             if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
                 continue;
-
+            
             Vector3 deformedPos = currentGridPoints[gridIndex.y, gridIndex.x];
             float probeZ = gridCenter.z - 0.15f;
             deformedPos.z = probeZ;
-
+            
             probe.transform.position = deformedPos;
         }
     }

@@ -72,7 +72,6 @@ public class ProbeDots : MonoBehaviour
     {
         HandleKeyboardProbeSelection();
         HandleProbeMovement();
-        HandleKeys();
     }
 
     // FUNCTION: Creation of probes
@@ -305,30 +304,6 @@ public class ProbeDots : MonoBehaviour
             probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed;
         }
         selectedProbeIndex = -1;
-    }
-
-    private void HandleKeys()
-    {
-        // Space key: Complete/mark current probe as done and exit focus mode
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
-            {
-                GameObject selectedProbe = probes[selectedProbeIndex];
-
-                // Reset movement state
-                isMoving = false;
-
-                selectedProbe.GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
-                selectedProbeIndex = -1; // Deselect probe
-
-                // Exit focus mode
-                if (focusSystem != null)
-                {
-                    focusSystem.ExitFocusMode();
-                }
-            }
-        }
     }
 
     // FUNCTION: Identify which probes are neighbors of each other based on their grid layout
