@@ -8,15 +8,11 @@ using Vector3 = UnityEngine.Vector3;
 public class ProbeDotConstraints : MonoBehaviour
 {
     private MainGrid mainGrid;
-
     internal float boundaryPadding = 0.1f;
     private float cellSize;
     internal float overlapBuffer = 0.25f;
-    
     internal float maxDisplacementFactor = 0.8f;
-
     private float minX, maxX, minY, maxY;
-
     private float MinX => minX;
     private float MaxX => maxX;
     private float MinY => minY;
@@ -87,7 +83,6 @@ public class ProbeDotConstraints : MonoBehaviour
     {
         float x = Mathf.Clamp(position.x, minX, maxX);
         float y = Mathf.Clamp(position.y, minY, maxY);
-
         return new Vector3(x, y, position.z);
     }
 

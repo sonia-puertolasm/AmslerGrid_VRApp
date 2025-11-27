@@ -15,7 +15,12 @@ public class MainGrid : MonoBehaviour
     private float centerDotSize = 0.3f;
     private Color centerDotColor = Color.red;
 
-    internal Vector3 gridCenterPosition = Vector3.zero;
+    // Viewing distance from camera (adjustable)
+    public float viewingDistance = 10f;
+
+    internal Vector3 gridCenterPosition;
+
+    public float ViewingDistance => viewingDistance;
 
     // Definition of storage for grid points
 
@@ -32,16 +37,24 @@ public class MainGrid : MonoBehaviour
     // Public accessor for grid points
     public GameObject[,] GridPoints => gridPoints;
 
-    // Initialization of all grid-generation functions
+    void Awake()
+    {
+        gridCenterPosition = new Vector3(0f, 0f, viewingDistance);
+        transform.position = gridCenterPosition;
+        transform.rotation = Quaternion.identity;
+    }
+
+    // Initialization of all grid-generation methods
     void Start()
     {
+        
         CreateGridPoints();
         DrawGrid();
         SetupCenterFixationPoint();
         SetupCamera();
     }
 
-    // FUNCTION: Camera setup in perspective mode to ensure full grid visibility
+    // METHOD: Camera setup in perspective mode to ensure full grid visibility
     private void SetupCamera()
     {
         Camera cam = Camera.main;
@@ -56,28 +69,25 @@ public class MainGrid : MonoBehaviour
         cam.farClipPlane = 1000f;
         cam.fieldOfView = 60f;
         
+        // Position camera at origin looking forward (positive Z)
+        cam.transform.position = Vector3.zero;
+        cam.transform.rotation = Quaternion.identity;
+        
+        // Verify that viewing distance is appropriate for field of view
         float margin = 1.05f;
         float gridWidth = totalGridWidth * margin;
         float gridHeight = totalGridWidth * margin;
 
         float vFovRad = cam.fieldOfView * Mathf.Deg2Rad;
         float aspect = cam.aspect;
-
         float hFovRad = 2f * Mathf.Atan(Mathf.Tan(vFovRad / 2f) * aspect);
 
-        float distForHeight = (gridHeight * 0.5f) / Mathf.Tan(vFovRad / 2f);
-        float distForWidth = (gridWidth * 0.5f) / Mathf.Tan(hFovRad / 2f);
-
-        float requiredDistance = Mathf.Max(distForHeight, distForWidth);
-
-        cam.transform.position = new Vector3(gridCenterPosition.x, gridCenterPosition.y, gridCenterPosition.z - requiredDistance);
-        cam.transform.rotation = Quaternion.identity;
-        cam.transform.LookAt(gridCenterPosition);
-
-        cam.transform.position += new Vector3(0, 0, -0.5f);
+        float minDistForHeight = (gridHeight * 0.5f) / Mathf.Tan(vFovRad / 2f);
+        float minDistForWidth = (gridWidth * 0.5f) / Mathf.Tan(hFovRad / 2f);
+        float recommendedDistance = Mathf.Max(minDistForHeight, minDistForWidth);
     }
 
-    // FUNCTION: Creation of grid intersection points as invisible spheres
+    // METHOD: Creation of grid intersection points as invisible spheres
     private void CreateGridPoints()
     {
         int pointsPerDimension = gridSize + 1; // Example: for gridSize 8, we need 9 points per dimension
@@ -122,7 +132,7 @@ public class MainGrid : MonoBehaviour
         }
     }
 
-    // FUNCTION: Drawing of grid lines using LineRenderer components
+    // METHOD: Drawing of grid lines using LineRenderer components
     void DrawGrid()
     {
         Transform existingGridLines = transform.Find("GridLines"); // Check for existing grid lines and remove them if they exist
@@ -174,7 +184,7 @@ public class MainGrid : MonoBehaviour
         }
     }
 
-    // FUNCTION: Helper method to create a line between two points using LineRenderer -> used in DrawGrid() FUNCTION
+    // METHOD: Helper method to create a line between two points using LineRenderer -> used in DrawGrid() METHOD
     private void CreateLine(string name, Vector3 start, Vector3 end, Transform parent)
     {
         GameObject lineObj = new GameObject(name); // Creation of a new GameObject to hold the LineRenderer
@@ -198,7 +208,7 @@ public class MainGrid : MonoBehaviour
         lineRenderer.SetPosition(1, end);
     }
 
-    // FUNCTION: Setup of the center fixation point in the middle of the grid
+    // METHOD: Setup of the center fixation point in the middle of the grid
     private void SetupCenterFixationPoint()
     {
         int centerIndex = gridSize / 2; // Calculation of the center index based on grid size
@@ -208,8 +218,8 @@ public class MainGrid : MonoBehaviour
         Renderer renderer = centerGridPoint.GetComponent<Renderer>(); // Get the Renderer component to modify its appearance
         renderer.enabled = true; // Make the center point visible
         renderer.material.color = centerDotColor; // Set the color of the center point
+        renderer.material.renderQueue = 3100; // Render after grid lines to avoid z-fighting
         centerGridPoint.transform.localScale = Vector3.one * centerDotSize; // Set the size of the center point
-        centerGridPoint.transform.position += new Vector3(0, 0, -0.2f); // Slightly offset in Z to ensure visibility over grid lines
 
         GridPointData pointData = centerGridPoint.GetComponent<GridPointData>(); // Access the custom GridPointData component
         pointData.isInteractable = false; // Set as non-interactable
@@ -219,7 +229,7 @@ public class MainGrid : MonoBehaviour
     }
 }
 
-// Custom component to store additional data for each grid point
+// METHOD: Custom component to store additional data for each grid point
 public class GridPointData : MonoBehaviour
 {
     // Grid coordinates
@@ -229,7 +239,6 @@ public class GridPointData : MonoBehaviour
     // State flags
     public bool isInteractable = true;
     public bool isCenterFixation = false;
-
     public bool isDeformed = false;
 
     // Original and adjusted positions for deformation tracking

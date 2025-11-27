@@ -38,6 +38,8 @@ public class IterationManager : MonoBehaviour
             cellSize = mainGrid.CellSize;
             gridCenter = mainGrid.GridCenterPosition;
             halfWidth = mainGrid.TotalGridWidth / 2f;
+
+            AlignToGridCenter();
         }
 
         StartCoroutine(InitializeIterationSystem());
@@ -57,6 +59,17 @@ public class IterationManager : MonoBehaviour
                 iterationFixationPoints[1] = centerFixation;
             }
         }
+    }
+
+    private void AlignToGridCenter()
+    {
+        if (mainGrid == null)
+        {
+            return;
+        }
+
+        transform.position = mainGrid.GridCenterPosition;
+        transform.rotation = Quaternion.identity;
     }
 
     void Update()
@@ -115,7 +128,7 @@ public class IterationManager : MonoBehaviour
         Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex];
 
         Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol);
-        parentDeformedPosition.z = gridCenter.z - 0.15f;
+        parentDeformedPosition.z = gridCenter.z;
         parentProbe.transform.position = parentDeformedPosition;
 
         parentProbe.SetActive(true);
@@ -136,7 +149,7 @@ public class IterationManager : MonoBehaviour
                     int probeCol = probeGridIndex.x;
 
                     Vector3 deformedPosition = gridRebuildManager.GetDeformedGridPoint(probeRow, probeCol);
-                    deformedPosition.z = gridCenter.z - 0.15f;
+                    deformedPosition.z = gridCenter.z;
 
                     probe.transform.position = deformedPosition;
                 }
@@ -237,7 +250,6 @@ public class IterationManager : MonoBehaviour
 
         if (!gridRebuildManager.probeGridIndices.ContainsKey(selectedProbe))
         {
-            Debug.LogError($"Parent probe not found in probeGridIndices!");
             return;
         }
 
@@ -273,8 +285,7 @@ public class IterationManager : MonoBehaviour
             }
 
             Vector3 gridPosition = gridRebuildManager.GetDeformedGridPoint(newRow, newCol);
-            
-            gridPosition.z = gridCenter.z - 0.15f;
+            gridPosition.z = gridCenter.z;
 
             GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             probe.name = $"ProbePoint_Parent{parentProbeIndex}_Iteration2_{probeCounter}";
@@ -287,13 +298,14 @@ public class IterationManager : MonoBehaviour
             {
                 renderer.enabled = true;
                 renderer.material.color = ProbeColors.Default;
+                renderer.material.renderQueue = 3100;
             }
 
             GridPointData pointData = probe.AddComponent<GridPointData>();
             pointData.isInteractable = true;
 
             Vector3 originalPosition = gridRebuildManager.GetOriginalGridPoint(newRow, newCol);
-            originalPosition.z = gridCenter.z - 0.15f;
+            originalPosition.z = gridCenter.z;
             
             newIteration2Positions[probe] = originalPosition;
             newIteration2Probes.Add(probe);

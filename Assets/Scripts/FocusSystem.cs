@@ -44,7 +44,7 @@ public class FocusSystem : MonoBehaviour
         }
     }
 
-    // Initialization of all grid-generation functions
+    // METHOD: Initialization of all focus system-generation functions
     void Start()
     {
         probeDots = FindObjectOfType<ProbeDots>();
@@ -54,32 +54,34 @@ public class FocusSystem : MonoBehaviour
 
         MainGrid mainGrid = FindObjectOfType<MainGrid>();
 
-        if (mainGrid != null) // Safety: ensures that the parameters are defined ONLY when the Amsler Grid exists
+        if (mainGrid != null) // Safety: Ensures that the parameters are defined ONLY when the Amsler Grid exists
         {
             gridSize = mainGrid.GridSize;
             gridCenter = mainGrid.GridCenterPosition;
+
+            AlignToGridCenter();
         }
 
         // Enable the focus system
         focusSystemEnabled = true;
     }
 
-    // Callback method for every frame
+    // METHOD: Retrieved every frame
     void Update()
     {
-        if (!focusSystemEnabled) // Safety: exit in case of focus system not being enabled
+        if (!focusSystemEnabled) // Safety: Exit in case of focus system not being enabled
         {
             return;
         }
 
-        if (probeDots == null || gridRebuildManager == null) // Safety: exit in case of probe dots and deformation manager not existing
+        if (probeDots == null || gridRebuildManager == null) // Safety: Exit in case of probe dots and deformation manager not existing
         {
             return;
         }
 
         int currentSelectedIndex = probeDots.selectedProbeIndex; // Obtaining of current index of selected probe
 
-        if (currentSelectedIndex != -1 && !isInFocusMode) // Safety: avoid un-indexable probe dots and ensure that the user is not already in focus mode
+        if (currentSelectedIndex != -1 && !isInFocusMode) // Safety: Avoid un-indexable probe dots and ensure that the user is not already in focus mode
         {
             EnterFocusMode(currentSelectedIndex);
         }
@@ -95,7 +97,7 @@ public class FocusSystem : MonoBehaviour
         }
     }
 
-    // FUNCTION: Entering of focus mode
+    // METHOD: Entering of focus mode
     private void EnterFocusMode(int probeIndex)
     {
         isInFocusMode = true;
@@ -108,14 +110,12 @@ public class FocusSystem : MonoBehaviour
             // Determine iteration level from GridRebuildManager
             if (gridRebuildManager != null && selectedProbe != null)
             {
-                // Check the probe's influence radius to determine its iteration
-                // Iteration 1: radius = 2, Iteration 2+: radius = 1
+                // Check the probe's influence radius to determine its iteration -> IT1 = 2 // HIGHER_IT = 1
                 int probeInfluenceRadius = GetProbeInfluenceRadius(selectedProbe);
                 focusRadius = probeInfluenceRadius;
             }
             else
             {
-                // Default to iteration 1 if we can't determine
                 focusRadius = 2;
             }
         }
@@ -124,10 +124,10 @@ public class FocusSystem : MonoBehaviour
         ShowFocusAreaAroundProbe(probeIndex);
     }
 
-    // FUNCTION: Exiting of focus mode
+    // METHOD: Exiting of focus mode
     public void ExitFocusMode()
     {
-        if (!isInFocusMode) //Safety: avoids the action of exiting focus mode while already not being in it
+        if (!isInFocusMode) //Safety: Avoids the action of exiting focus mode while already not being in it
         {
             return;
         }
@@ -138,21 +138,21 @@ public class FocusSystem : MonoBehaviour
         RestoreProbeVisibility();
     }
 
-    // FUNCTION: Displaying of area of interest around the selected probe dot
+    // METHOD: Displaying of area of interest around the selected probe dot
     private void ShowFocusAreaAroundProbe(int probeIndex)
     {
-        if (gridRebuildManager == null || probeDots == null || probeDots.probes == null) //Safety: exit in case of the main elements necessary for focus mode not existing
+        if (gridRebuildManager == null || probeDots == null || probeDots.probes == null) //Safety: Exit in case of the main elements necessary for focus mode not existing
             return;
 
-        if (probeIndex < 0 || probeIndex >= probeDots.probes.Count) // Safety: exit for avoiding invalid probe dot search
+        if (probeIndex < 0 || probeIndex >= probeDots.probes.Count) // Safety: Exit for avoiding invalid probe dot search
             return;
 
         GameObject selectedProbe = probeDots.probes[probeIndex];
 
-        if (selectedProbe == null) // Safety: exit in case of no selected probe
+        if (selectedProbe == null) // Safety: Exit in case of no selected probe
             return;
 
-        //Definition of probe grid position in x-axis and y-axis
+        // Definition of probe grid position in x-axis and y-axis
         Vector2Int probeGridPos = GetProbeGridIndex(selectedProbe);
         int probeRow = probeGridPos.y;
         int probeCol = probeGridPos.x;
@@ -184,7 +184,7 @@ public class FocusSystem : MonoBehaviour
         if (probeRow >= 0 && probeRow < gridRebuildManager.horizontalLinePool.Count)
         {
             LineRenderer horizontalLine = gridRebuildManager.horizontalLinePool[probeRow]; // Obtanining of specific horizontal line
-            if (horizontalLine != null) // Safety: ensure that the horizontal line exists
+            if (horizontalLine != null) // Safety: Ensure that the horizontal line exists
             {
                 CreateLineSegment(horizontalLine, focusMinCol, focusMaxCol,
                                 $"Horizontal_Row{probeRow}", true); // Display specific segment of the original rendered line
@@ -194,21 +194,21 @@ public class FocusSystem : MonoBehaviour
         if (probeCol >= 0 && probeCol < gridRebuildManager.verticalLinePool.Count)
         {
             LineRenderer verticalLine = gridRebuildManager.verticalLinePool[probeCol]; // Obtanining of specific vertical line
-            if (verticalLine != null) // Safety: ensure that the vertical line exists
+            if (verticalLine != null) // Safety: Ensure that the vertical line exists
             {
                 CreateLineSegment(verticalLine, focusMinRow, focusMaxRow,
                                 $"Vertical_Col{probeCol}", false); // Display specific segment of the original rendered line
             }
         }
 
-        if (centerFixationPoint != null) // Safety: ensure that the center fixation point exists
+        if (centerFixationPoint != null) // Safety: Ensure that the center fixation point exists
         {
             Renderer renderer = centerFixationPoint.GetComponent<Renderer>(); // Display the center fixation point
             if (renderer != null) renderer.enabled = true;
         }
     }
 
-    // HELPER FUNCTION: Create "new" visual segment by extracting a portion of an existing LineRenderer
+    // HELPER METHOD: Create "new" visual segment by extracting a portion of an existing LineRenderer
     private void CreateLineSegment(LineRenderer originalLine, int startIndex, int endIndex, string name, bool isHorizontal)
     {
         GameObject segmentObj = new GameObject(name); // Definition of segment GO
@@ -230,7 +230,7 @@ public class FocusSystem : MonoBehaviour
         for (int i = 0; i < segmentLength; i++)
         {
             int originalIndex = startIndex + i;
-            if (originalIndex >= 0 && originalIndex < originalLine.positionCount) // Safety: avoids invalid indices
+            if (originalIndex >= 0 && originalIndex < originalLine.positionCount) // Safety: Avoids invalid indices
             {
                 Vector3 pos = originalLine.GetPosition(originalIndex);
                 segmentLine.SetPosition(i, pos);
@@ -240,26 +240,26 @@ public class FocusSystem : MonoBehaviour
         focusModeLineSegments.Add(new FocusLineSegment(segmentLine, originalLine, startIndex, endIndex, isHorizontal));
     }
 
-    // FUNCTION: Synchronize the line segments created in focus mode with the original lines
+    // METHOD: Synchronize the line segments created in focus mode with the original lines
     private void UpdateFocusModeSegments()
     {
-        if (gridRebuildManager == null) // Safety: avoids this method taking place when there is no deformation
+        if (gridRebuildManager == null) // Safety: Avoids this method taking place when there is no deformation
             return;
 
         foreach (FocusLineSegment segment in focusModeLineSegments)
         {
-            if (segment.segmentRenderer == null || segment.sourceRenderer == null) // Safety: ensure that the segment's renderer and the source renderer exist
+            if (segment.segmentRenderer == null || segment.sourceRenderer == null) // Safety: Ensure that the segment's renderer and the source renderer exist
                 continue;
 
             int segmentLength = segment.endIndex - segment.startIndex + 1;
 
             for (int i = 0; i < segmentLength; i++) // Iteration over each segmentLength position
             {
-                int sourceIndex = segment.startIndex + i; // i: 0 to segmentLength-1
-                if (sourceIndex >= 0 && sourceIndex < segment.sourceRenderer.positionCount) // Safety: ensuring the method only accesses valid positions
+                int sourceIndex = segment.startIndex + i;
+                if (sourceIndex >= 0 && sourceIndex < segment.sourceRenderer.positionCount) // Safety: Ensure the method only accesses valid positions
                 {
-                    Vector3 currentPos = segment.sourceRenderer.GetPosition(sourceIndex); // Extract position
-                    segment.segmentRenderer.SetPosition(i, currentPos); //Copy position to the segment
+                    Vector3 currentPos = segment.sourceRenderer.GetPosition(sourceIndex);
+                    segment.segmentRenderer.SetPosition(i, currentPos);
                 }
             }
         }
@@ -268,7 +268,7 @@ public class FocusSystem : MonoBehaviour
     // HELPER FUNCTION: Restoring all lines of the original Amsler Grid
     private void RestoreAllLines()
     {
-        if (gridRebuildManager == null) // Safety: ensure that there exists the line-restoring components, if not, exit
+        if (gridRebuildManager == null) // Safety: Ensure that there exists the line-restoring components, if not, exit
             return;
 
         foreach (FocusLineSegment segment in focusModeLineSegments) // Iterate over each focus mode line segment
@@ -302,7 +302,7 @@ public class FocusSystem : MonoBehaviour
     // HELPER FUNCTION: Hides all probe dots except the selected one
     private void HideAllProbesExcept(int selectedIndex)
     {
-        if (probeDots == null || probeDots.probes == null) // Safety: exit in case there is no existing probe dots
+        if (probeDots == null || probeDots.probes == null) // Safety: Exit in case there is no existing probe dots
             return;
 
         originalProbeVisibility.Clear(); // Eliminate the visibility of the probe dots
@@ -311,7 +311,7 @@ public class FocusSystem : MonoBehaviour
         {
             GameObject probe = probeDots.probes[i]; // Retrieving of the probe dot of a specific index
 
-            if (probe == null) // Safety: ensures avoiding null probe dots
+            if (probe == null) // Safety: Ensure avoiding null probe dots
 
                 continue;
 
@@ -340,11 +340,11 @@ public class FocusSystem : MonoBehaviour
     // HELPER FUNCTION: Obtaining of the grid index of a specific probe dot
     private Vector2Int GetProbeGridIndex(GameObject probe)
     {
-        if (gridRebuildManager == null) // Safety: exit in case of null deformation manager
+        if (gridRebuildManager == null) // Safety: Exit in case of null deformation manager
         {
             return Vector2Int.zero;
         }
-        return gridRebuildManager.GetProbeGridCell(probe); // use the deformation manager to obtain the grid cell of the probe dot
+        return gridRebuildManager.GetProbeGridCell(probe); // Use the deformation manager to obtain the grid cell of the probe dot
     }
 
     // HELPER FUNCTION: Get the influence radius for a probe (determines iteration level)
@@ -352,8 +352,15 @@ public class FocusSystem : MonoBehaviour
     {
         if (gridRebuildManager == null || probe == null)
         {
-            return 2; // Default to iteration 1
+            return 2;
         }
         return gridRebuildManager.GetProbeInfluenceRadius(probe);
+    }
+
+    // HELPER FUNCTION: Keep the object anchored to the grid's origin
+    private void AlignToGridCenter()
+    {
+        transform.position = gridCenter;
+        transform.rotation = Quaternion.identity; // Reset rotation
     }
 }

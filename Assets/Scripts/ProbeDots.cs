@@ -34,9 +34,10 @@ public class ProbeDots : MonoBehaviour
         // Define GO in reference to mainGrid
         if (mainGrid != null)
         {
-            transform.position = mainGrid.transform.position;
-            transform.rotation = mainGrid.transform.rotation;
-            transform.localScale = mainGrid.transform.localScale;
+            Vector3 alignedPosition = mainGrid.GridCenterPosition;
+            transform.position = alignedPosition;
+            transform.rotation = Quaternion.identity;
+            transform.localScale = Vector3.one;
         }
 
         // Initialize or find the constraints component
@@ -64,7 +65,7 @@ public class ProbeDots : MonoBehaviour
             yield return null; // Wait one frame
         }
 
-        CreateProbes(); // Execute function for probe creation after grid points are ready
+        CreateProbes(); // Execute method for probe creation after grid points are ready
         IdentifyProbeNeighbors(); // Identify which probes are neighbors of each other
     }
 
@@ -75,13 +76,13 @@ public class ProbeDots : MonoBehaviour
         HandleKeys();
     }
 
-    // FUNCTION: Creation of probes
+    // METHOD: Creation of probes
     private void CreateProbes()
     {
         // Get the grid points from the MainGrid
         GameObject[,] gridPoints = mainGrid.GridPoints;
 
-        if (gridPoints == null) // Safety check on whether the gridPoints are available (or not)
+        if (gridPoints == null) // Safety: Check on whether the gridPoints are available (or not)
         {
             return;
         }
@@ -123,15 +124,13 @@ public class ProbeDots : MonoBehaviour
             {
                 renderer.enabled = true;
                 renderer.material.color = ProbeColors.Default;
+                renderer.material.renderQueue = 3100; // Ensure probes render on top without z offsets
             }
 
             // Set the scale of the grid points to probe dot size
             gridPoint.transform.localScale = Vector3.one * probeDotSize;
 
-            // Adjust Z position slightly to be in front of grid lines
-            Vector3 currentPos = gridPoint.transform.position;
-            Vector3 adjustedPos = new Vector3(currentPos.x, currentPos.y, currentPos.z - 0.15f);
-            gridPoint.transform.position = adjustedPos;
+            Vector3 adjustedPos = gridPoint.transform.position;
 
             // Store initial position
             probeInitialPositions[gridPoint] = adjustedPos;
@@ -151,7 +150,7 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // FUNCTION: Handle probe selection via numerical pad keyboard (1-9)
+    // METHOD: Handle probe selection via numerical pad keyboard (1-9)
     private void HandleKeyboardProbeSelection()
     {
         KeyCode[] numpadKeys = new KeyCode[]
@@ -192,7 +191,7 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // HELPER FUNCTION: Map keyboard position (0-8) to probe index based on iteration
+    // HELPER METHOD: Map keyboard position (0-8) to probe index based on iteration
     private int GetProbeIndexFromKeyPosition(int keyPosition, bool isIteration2)
     {
         if (isIteration2)
@@ -207,7 +206,7 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // FUNCTION: Handle probe movement based on arrow key input
+    // METHOD: Handle probe movement based on arrow key input
     private void HandleProbeMovement()
     {
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
@@ -264,7 +263,6 @@ public class ProbeDots : MonoBehaviour
             proposedPosition.z = currentPosition.z;
 
             // Apply constraints if the constraints component is available
-            // (This will handle both boundary and neighbor constraints)
             if (constraints != null)
             {
                 List<Vector3> neighborPositions = GetNeighborPositions(selectedProbeIndex);
@@ -282,10 +280,10 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // FUNCTION: Select a probe by index
+    // METHOD: Select a probe by index
     private void SelectProbe(int index)
     {
-        if (index >= probes.Count) return; // Safety check. If the index of the probe is out of range, exit.
+        if (index >= probes.Count) return; // Safety: If the index of the probe is out of range, exit.
 
         // Deselect previous probe and restore to 'initial' state coloring
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
@@ -331,30 +329,24 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // FUNCTION: Identify which probes are neighbors of each other based on their grid layout
+    //METHOD: Identify which probes are neighbors of each other based on their grid layout
     private void IdentifyProbeNeighbors()
     {
-        // Probe layout (8 probes in 3x3 grid excluding center):
-        // Grid positions in (col, row):
-        // 5(2,6)    6(4,6)    7(6,6)
-        // 3(2,4)    [CENTER]  4(6,4)
-        // 0(2,2)    1(4,2)    2(6,2)
-
         probeNeighbors.Clear();
 
-        // Define neighbor relationships based on adjacency and close diagonals
+        // Define neighbor relationships
 
-        probeNeighbors[0] = new List<int> { 1, 2, 3, 5 };           // Bottom-left: right(2.5), far-right(5.0), up(2.5), far-up(5.0)
-        probeNeighbors[1] = new List<int> { 0, 2, 3, 4, 6 };        // Bottom-center: left(2.5), right(2.5), diag-up-left(3.5), diag-up-right(3.5), far-up(5.0)
-        probeNeighbors[2] = new List<int> { 0, 1, 4, 7 };           // Bottom-right: far-left(5.0), left(2.5), up(2.5), far-up(5.0)
-        probeNeighbors[3] = new List<int> { 0, 1, 5, 6 };           // Middle-left: down(2.5), diag-down-right(3.5), up(2.5), diag-up-right(3.5)
-        probeNeighbors[4] = new List<int> { 1, 2, 6, 7 };           // Middle-right: diag-down-left(3.5), down(2.5), diag-up-left(3.5), up(2.5)
-        probeNeighbors[5] = new List<int> { 0, 3, 6 };              // Top-left: far-down(5.0), down(2.5), right(2.5)
-        probeNeighbors[6] = new List<int> { 1, 3, 4, 5, 7 };        // Top-center: far-down(5.0), diag-down-left(3.5), diag-down-right(3.5), left(2.5), right(2.5)
-        probeNeighbors[7] = new List<int> { 2, 4, 6 };              // Top-right: far-down(5.0), down(2.5), left(2.5)
+        probeNeighbors[0] = new List<int> { 1, 2, 3, 5 };           
+        probeNeighbors[1] = new List<int> { 0, 2, 3, 4, 6 };        
+        probeNeighbors[2] = new List<int> { 0, 1, 4, 7 };           
+        probeNeighbors[3] = new List<int> { 0, 1, 5, 6 };           
+        probeNeighbors[4] = new List<int> { 1, 2, 6, 7 };          
+        probeNeighbors[5] = new List<int> { 0, 3, 6 };              
+        probeNeighbors[6] = new List<int> { 1, 3, 4, 5, 7 };        
+        probeNeighbors[7] = new List<int> { 2, 4, 6 };              
     }
 
-    // FUNCTION: Get the CURRENT world positions of all neighbors for a given probe
+    // METHOD: Get the current world positions of all neighbors for a given probe
     private List<Vector3> GetNeighborPositions(int probeIndex)
     {
         List<Vector3> neighborPositions = new List<Vector3>();
@@ -366,7 +358,7 @@ public class ProbeDots : MonoBehaviour
                 if (neighborIndex >= 0 && neighborIndex < probes.Count)
                 {
                     GameObject neighborProbe = probes[neighborIndex];
-                    // Use CURRENT position to prevent overlap with displaced neighbors
+                    // Use current position to prevent overlap with displaced neighbors
                     neighborPositions.Add(neighborProbe.transform.position);
                 }
             }
@@ -376,7 +368,6 @@ public class ProbeDots : MonoBehaviour
         if (mainGrid != null)
         {
             Vector3 centerPosition = mainGrid.GridCenterPosition;
-            // Adjust Z to match probe depth
             if (probes.Count > 0)
             {
                 centerPosition.z = probes[0].transform.position.z;
