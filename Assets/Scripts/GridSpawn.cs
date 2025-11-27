@@ -15,7 +15,7 @@ public class MainGrid : MonoBehaviour
     private float centerDotSize = 0.3f;
     private Color centerDotColor = Color.red;
 
-    internal Vector3 gridCenterPosition = new Vector3(0f, 0f, 15f); // Grid positioned in front of camera
+    internal Vector3 gridCenterPosition = Vector3.zero;
 
     // Definition of storage for grid points
 
@@ -35,11 +35,6 @@ public class MainGrid : MonoBehaviour
     // Initialization of all grid-generation functions
     void Start()
     {
-        // Ensure MainGrid GameObject is at origin (0, 0, 0)
-        transform.position = Vector3.zero;
-        transform.rotation = Quaternion.identity;
-        transform.localScale = Vector3.one;
-
         CreateGridPoints();
         DrawGrid();
         SetupCenterFixationPoint();
@@ -60,11 +55,26 @@ public class MainGrid : MonoBehaviour
         cam.nearClipPlane = 0.1f;
         cam.farClipPlane = 1000f;
         cam.fieldOfView = 60f;
+        
+        float margin = 1.05f;
+        float gridWidth = totalGridWidth * margin;
+        float gridHeight = totalGridWidth * margin;
 
-        // Camera positioned at origin (0, 0, 0) looking forward at the grid
-        cam.transform.position = Vector3.zero;
+        float vFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+        float aspect = cam.aspect;
+
+        float hFovRad = 2f * Mathf.Atan(Mathf.Tan(vFovRad / 2f) * aspect);
+
+        float distForHeight = (gridHeight * 0.5f) / Mathf.Tan(vFovRad / 2f);
+        float distForWidth = (gridWidth * 0.5f) / Mathf.Tan(hFovRad / 2f);
+
+        float requiredDistance = Mathf.Max(distForHeight, distForWidth);
+
+        cam.transform.position = new Vector3(gridCenterPosition.x, gridCenterPosition.y, gridCenterPosition.z - requiredDistance);
         cam.transform.rotation = Quaternion.identity;
         cam.transform.LookAt(gridCenterPosition);
+
+        cam.transform.position += new Vector3(0, 0, -0.5f);
     }
 
     // FUNCTION: Creation of grid intersection points as invisible spheres
