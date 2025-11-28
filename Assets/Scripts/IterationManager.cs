@@ -29,7 +29,6 @@ public class IterationManager : MonoBehaviour
         probeDots = FindObjectOfType<ProbeDots>();
         mainGrid = FindObjectOfType<MainGrid>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
-        displacementTracker = FindObjectOfType<DisplacementTracker>();
         focusSystem = FindObjectOfType<FocusSystem>();
 
         if (mainGrid != null)
