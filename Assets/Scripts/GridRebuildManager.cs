@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class GridRebuildManager : MonoBehaviour
 {
-    // Definition of grid configuration specific parameters
+    // Retrieval of grid configuration specific parameters
     private MainGrid mainGrid;
     private ProbeDots probeDots;
     private GameObject centerFixationPoint;
@@ -44,7 +44,7 @@ public class GridRebuildManager : MonoBehaviour
         mainGrid = FindObjectOfType<MainGrid>();
         probeDots = FindObjectOfType<ProbeDots>();
 
-        if (mainGrid == null || probeDots == null)
+        if (mainGrid == null || probeDots == null) // Safety: Avoids execution in case the main grid and/or probe dots don't exist
         {
             enabled = false;
             return;
@@ -57,16 +57,18 @@ public class GridRebuildManager : MonoBehaviour
     // METHOD: Coroutine for obtaining of grid metadata and building of line pools
     private System.Collections.IEnumerator InitializeSystem()
     {
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.1f); // Safety: Waits for 0.1 seconds before proceeding for ensuring a spawn of the scene objects
 
+        // Obtaining of core metadata from the grid
         gridSize = mainGrid.GridSize;
         cellSize = mainGrid.CellSize;
         gridCenter = mainGrid.GridCenterPosition;
         halfWidth = mainGrid.TotalGridWidth / 2f;
         centerFixationPoint = GameObject.Find("CenterFixationPoint");
-        if (centerFixationPoint == null) yield break;
 
-        int pointCount = gridSize + 1;
+        if (centerFixationPoint == null) yield break; // Safety: If center fixation point is absent -> early start to avoid null references
+
+        int pointCount = gridSize + 1; // Calculation of points and allocation of arrays for coordinates
         originalGridPoints = new Vector3[pointCount, pointCount];
         currentGridPoints = new Vector3[pointCount, pointCount];
         accumulatedDisplacement = new Vector3[pointCount, pointCount];
@@ -77,7 +79,7 @@ public class GridRebuildManager : MonoBehaviour
         CreateLineRendererPool();
 
         lastProbePositions = new Vector3[probeDots.probes.Count];
-        for (int i = 0; i < probeDots.probes.Count; i++) // Loop through every probe dot
+        for (int i = 0; i < probeDots.probes.Count; i++) // Loop through every probe dot for capturing their initial state
         {
             GameObject probe = probeDots.probes[i];
             Vector3 originalPos = probe.transform.position;
@@ -116,7 +118,7 @@ public class GridRebuildManager : MonoBehaviour
         if (!enableDeformation) // Safety: Ensures avoiding construction of deformable grid if deformation is not enabled
             return;
 
-        if (CheckProbesMoved())
+        if (CheckProbesMoved()) 
         {
             needsRebuild = true;
         }
@@ -154,6 +156,7 @@ public class GridRebuildManager : MonoBehaviour
     private void HideOriginalGridLines()
     {
         Transform gridLinesParent = mainGrid.transform.Find("GridLines");
+
         if (gridLinesParent != null)
         {
             Destroy(gridLinesParent.gameObject);
@@ -202,7 +205,7 @@ public class GridRebuildManager : MonoBehaviour
         if (allProbes == null || allProbes.Count == 0) // Safety: Ensure there is a probe list to inspect, if not exit
             return false;
 
-        if (lastProbePositions == null || lastProbePositions.Length != allProbes.Count) // Rebuilding of the cache by recording each probe's current world position
+        if (lastProbePositions == null || lastProbePositions.Length != allProbes.Count) //
         {
             lastProbePositions = new Vector3[allProbes.Count];
             for (int i = 0; i < allProbes.Count; i++) 
@@ -254,7 +257,7 @@ public class GridRebuildManager : MonoBehaviour
         int pointCount = gridSize + 1;
         GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
         
-        if (selectedProbe == null)
+        if (selectedProbe == null) // Safety: Avoids action in case there is no selected probe
             return;
 
         Vector3 probeCurrentPos = selectedProbe.transform.position;
@@ -344,7 +347,7 @@ public class GridRebuildManager : MonoBehaviour
 
             Vector2Int gridIndex = probeGridIndices[probe];
             
-            if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize)
+            if (gridIndex.y < 0 || gridIndex.y > gridSize || gridIndex.x < 0 || gridIndex.x > gridSize) // If position is within boundaries
                 continue;
             
             Vector3 deformedPos = currentGridPoints[gridIndex.y, gridIndex.x];
@@ -358,7 +361,7 @@ public class GridRebuildManager : MonoBehaviour
     // HELPER METHOD: Contributes to a smooth approach in the reconstruction of the deformed grid
     private float CalculateAdaptiveWeight(int delta, int negativeLimit, int positiveLimit)
     {
-        if (delta == 0)
+        if (delta == 0) // When the cell offset = 0, full infleunce at the center
             return 1.0f;
 
         float maxDist;
@@ -430,7 +433,7 @@ public class GridRebuildManager : MonoBehaviour
                 return dist;
             }
 
-            if (centerFixationPoint != null && centerFixationPoint.activeInHierarchy) // Safety: Ensures analysis is performed 
+            if (centerFixationPoint != null && centerFixationPoint.activeInHierarchy) // Safety: Ensures the center fixation point exists before proceeding
             {
                 Vector2Int centerIndex = GetProbeGridIndex(centerFixationPoint);
                 if (centerIndex.y == checkRow && centerIndex.x == checkCol)
@@ -555,12 +558,13 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
+    // HELPER METHOD: Introduces rebuild parameter
     public void ForceRebuild()
     {
         needsRebuild = true;
     }
 
-    // METHOD: Performs a resetting of the grid
+    // METHOD: Performs a resetting of the grid through iteration over rows and columns
     public void ResetGrid()
     {
         int pointCount = gridSize + 1;
@@ -577,11 +581,13 @@ public class GridRebuildManager : MonoBehaviour
         needsRebuild = true;
     }
 
+    // HELPER METHOD: Obtain Amsler grid cell given a probe dot
     public Vector2Int GetProbeGridCell(GameObject probe)
     {
         return GetProbeGridIndex(probe);
     }
 
+    // HELPER METHOD: Extract deformed point given the grid row, col position
     public Vector3 GetDeformedGridPoint(int row, int col)
     {
         if (currentGridPoints != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
@@ -591,11 +597,13 @@ public class GridRebuildManager : MonoBehaviour
         return Vector3.zero;
     }
 
+    // HELPER METHOD: Extraction of the grid size
     public int GetGridSize()
     {
         return gridSize;
     }
 
+    // HELPER METHOD: Extraction of the original grid points
     public Vector3 GetOriginalGridPoint(int row, int col)
     {
         if (originalGridPoints != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
@@ -605,6 +613,7 @@ public class GridRebuildManager : MonoBehaviour
         return Vector3.zero;
     }
 
+    // HELPER METHOD: Extraction of accumulated displacement data
     public Vector3 GetAccumulatedDisplacement(int row, int col)
     {
         if (accumulatedDisplacement != null && row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
@@ -614,14 +623,15 @@ public class GridRebuildManager : MonoBehaviour
         return Vector3.zero;
     }
 
+    // METHOD: Registers probe dot given valid reference and considering if it hasn't been tracked before
     public void RegisterProbe(GameObject probe, Vector3 originalPosition, int iterationLevel = 1, Vector2Int? gridIndex = null)
     {
         if (probe != null && !allProbes.Contains(probe))
         {
             allProbes.Add(probe);
-            probeOriginalPositions[probe] = originalPosition;
+            probeOriginalPositions[probe] = originalPosition; // Storage of probe dot's original position
             
-            int influenceRadius = (iterationLevel == 1) ? 2 : 1;
+            int influenceRadius = (iterationLevel == 1) ? 2 : 1; // Determine how far the probe dot should influence the grid
             probeInfluenceRadius[probe] = influenceRadius;
             
             if (gridIndex.HasValue)
@@ -636,6 +646,7 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
+    // HELPER METHOD: Ejects a probe dot from the tracking to keep the deformation cache consistent
     public void UnregisterProbe(GameObject probe)
     {
         if (probe != null)
@@ -647,6 +658,7 @@ public class GridRebuildManager : MonoBehaviour
         }
     }
 
+    // HELPER METHOD: Extracts influence radius of a probe dot
     public int GetProbeInfluenceRadius(GameObject probe)
     {
         if (probe != null && probeInfluenceRadius.ContainsKey(probe))

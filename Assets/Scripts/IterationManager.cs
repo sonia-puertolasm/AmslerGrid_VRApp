@@ -96,7 +96,7 @@ public class IterationManager : MonoBehaviour
         }
     }
 
-    // METHOD: Manages the interaction given enter key engagement
+    // HELPER METHOD: Manages the interaction given enter key engagement
     private void HandleEnterKey()
     {
         if (currentIteration == 1 && probeDots != null && probeDots.selectedProbeIndex >= 0) // Safety: Ensures the iteration is correct and the probe dots exist
@@ -129,7 +129,7 @@ public class IterationManager : MonoBehaviour
             return;
         }
 
-        Vector2Int parentGridIndex = gridRebuildManager.probeGridIndices[parentProbe]; // Indexing of the parent probe
+        Vector2Int parentGridIndex = gridRebuildManager.probeGridIndices[parentProbe]; // Indexing of the parent probe in rows (x) and columns (y)
         int parentRow = parentGridIndex.y;
         int parentCol = parentGridIndex.x;
 
@@ -137,23 +137,23 @@ public class IterationManager : MonoBehaviour
 
         UpdateProbeInfluenceRadius(parentProbe, 1);
 
-        List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex];
-        Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex];
+        List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex]; // Defines a list for the probe dots for IT2 given the parent probe dot
+        Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex]; // Defines a dictionary for the positions for IT2 given the parent probe dot
 
-        Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol);
-        parentDeformedPosition.z = gridCenter.z;
+        Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol); // Extraction of deformed position of parent probe dot
+        parentDeformedPosition.z = gridCenter.z; // Define z-coordinate as center of the grid
         parentProbe.transform.position = parentDeformedPosition;
 
-        parentProbe.SetActive(true);
+        parentProbe.SetActive(true); 
         Renderer parentRenderer = parentProbe.GetComponent<Renderer>();
-        if (parentRenderer != null)
+        if (parentRenderer != null) // Safety: Ensures performance only if the parent renderer exists
         {
             parentRenderer.enabled = true;
         }
 
-        foreach (GameObject probe in iteration2Probes)
+        foreach (GameObject probe in iteration2Probes) // Iteration over probe dots for IT2
         {
-            if (probe != null)
+            if (probe != null) // Safety: Proceeds as long as the probe dots exist
             {
                 if (gridRebuildManager.probeGridIndices.ContainsKey(probe))
                 {
@@ -169,17 +169,17 @@ public class IterationManager : MonoBehaviour
 
                 probe.SetActive(true);
                 Renderer renderer = probe.GetComponent<Renderer>();
-                if (renderer != null)
+                if (renderer != null) // Safety: Ensures performance only if the parent renderer exists
                 {
                     renderer.enabled = true;
                 }
             }
         }
 
-        List<GameObject> allIteration2Probes = new List<GameObject>(iteration2Probes);
-        allIteration2Probes.Add(parentProbe);
+        List<GameObject> allIteration2Probes = new List<GameObject>(iteration2Probes); // Creates a list for storing over time all iteration 2 probes
+        allIteration2Probes.Add(parentProbe); // Appends the parent probe to the stored ones
 
-        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(iteration2Positions);
+        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(iteration2Positions); // Clone iteration 2 map to be able to extend it without impact on the original
         if (gridRebuildManager.probeOriginalPositions.ContainsKey(parentProbe))
         {
             allIteration2Positions[parentProbe] = gridRebuildManager.probeOriginalPositions[parentProbe];
@@ -193,12 +193,12 @@ public class IterationManager : MonoBehaviour
         currentParentProbeIndex = parentProbeIndex;
     }
 
-    // METHOD: Manages the interaction with the backspace key
+    // HELPER METHOD: Manages the interaction with the backspace key
     private void HandleBackspaceKey()
     {
         if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
         {
-            if (currentIteration == 2)
+            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
             {
                 ReturnToIteration1();
             }
@@ -229,7 +229,7 @@ public class IterationManager : MonoBehaviour
         if (iterationFixationPoints.ContainsKey(1))
         {
             GameObject fixation = iterationFixationPoints[1];
-            if (fixation != null)
+            if (fixation != null) // Safety: Proceeds ONLY if the center fixation point exists
             {
                 fixation.SetActive(true);
                 Renderer renderer = fixation.GetComponent<Renderer>();
@@ -266,7 +266,7 @@ public class IterationManager : MonoBehaviour
             return;
         }
 
-        if (!gridRebuildManager.probeGridIndices.ContainsKey(selectedProbe))
+        if (!gridRebuildManager.probeGridIndices.ContainsKey(selectedProbe)) // Safety: Avoids execution if the probe dot is invalid
         {
             return;
         }
@@ -291,19 +291,19 @@ public class IterationManager : MonoBehaviour
 
         int probeCounter = 0;
 
-        foreach (Vector2Int offset in neighborOffsets)
+        foreach (Vector2Int offset in neighborOffsets) // Iterates each offset to convert into a candidate cell 
         {
             int newRow = parentRow + offset.y;
             int newCol = parentCol + offset.x;
 
             if (newRow <= 0 || newRow >= gridSizeValue || 
-                newCol <= 0 || newCol >= gridSizeValue)
+                newCol <= 0 || newCol >= gridSizeValue) // Safety: Discard offsets that fall outside the valid range of the grid 
             {
                 continue;
             }
 
             Vector3 gridPosition = gridRebuildManager.GetDeformedGridPoint(newRow, newCol);
-            gridPosition.z = gridCenter.z;
+            gridPosition.z = gridCenter.z; // Align deformed position z-coordinate with grid center
 
             GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             probe.name = $"ProbePoint_Parent{parentProbeIndex}_Iteration2_{probeCounter}";
@@ -319,7 +319,7 @@ public class IterationManager : MonoBehaviour
                 renderer.material.renderQueue = 3100;
             }
 
-            GridPointData pointData = probe.AddComponent<GridPointData>();
+            GridPointData pointData = probe.AddComponent<GridPointData>(); // Sets the new probe dots as interactable
             pointData.isInteractable = true;
 
             Vector3 originalPosition = gridRebuildManager.GetOriginalGridPoint(newRow, newCol);
@@ -354,13 +354,13 @@ public class IterationManager : MonoBehaviour
     // METHOD: Hides all probe dots of iteration 1 except the selected 1
     private void HideIteration1ProbesExcept(GameObject exceptProbe)
     {
-        if (iterationProbes.ContainsKey(1))
+        if (iterationProbes.ContainsKey(1)) // Safety: Checks before proceeding if iteration 1 has been registered
         {
             foreach (GameObject probe in iterationProbes[1])
             {
-                if (probe != null && probe != exceptProbe)
+                if (probe != null && probe != exceptProbe) // Safety: Ignore when probes are null or the exceptProbe
                 {
-                    Renderer renderer = probe.GetComponent<Renderer>();
+                    Renderer renderer = probe.GetComponent<Renderer>(); // Disable rendering of probes that are not exceptProbe
                     if (renderer != null)
                     {
                         renderer.enabled = false;
@@ -397,7 +397,7 @@ public class IterationManager : MonoBehaviour
     {
         HideAllIteration2Probes();
 
-        if (iterationProbes.ContainsKey(1))
+        if (iterationProbes.ContainsKey(1)) // Safety: Checks before proceeding if iteration 1 has been registered
         {
             foreach (GameObject probe in iterationProbes[1])
             {
