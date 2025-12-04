@@ -13,7 +13,7 @@ public class MainGrid : MonoBehaviour
 
     // Definition of center fixation point parameters
     private float centerDotSize = 0.3f;
-    private Color centerDotColor = Color.red;
+    private Color centerDotColor = new Color32(255, 0, 0, 255);
 
     // Viewing distance from camera (adjustable)
     public float viewingDistance = 10f;
@@ -217,6 +217,7 @@ public class MainGrid : MonoBehaviour
 
         Renderer renderer = centerGridPoint.GetComponent<Renderer>(); // Get the Renderer component to modify its appearance
         renderer.enabled = true; // Make the center point visible
+        renderer.material = new Material(Shader.Find("Unlit/Color"));
         renderer.material.color = centerDotColor; // Set the color of the center point
         renderer.material.renderQueue = 3100; // Render after grid lines to avoid z-fighting
         centerGridPoint.transform.localScale = Vector3.one * centerDotSize; // Set the size of the center point
