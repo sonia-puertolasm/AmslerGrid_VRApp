@@ -61,6 +61,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\IterationManager.cs" />
+    <Compile Include="Assets\Scripts\VRInputManager.cs" />
     <Compile Include="Assets\Scripts\Old\IAGFocusSystem.cs" />
     <Compile Include="Assets\Scripts\ProbeDotConstraints.cs" />
     <Compile Include="Assets\Scripts\ProbeDots.cs" />

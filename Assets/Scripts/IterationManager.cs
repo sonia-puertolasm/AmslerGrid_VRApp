@@ -85,12 +85,20 @@ public class IterationManager : MonoBehaviour
 
     void Update() // Update is called once per frame
     {
+        // ENTER KEY: Advance to higher iteration when a probe is selected
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
         {
-            HandleEnterKey(); // Call method when pressing return key
+            HandleEnterKey();
         }
 
-        if (Input.GetKeyDown(KeyCode.Backspace)) // Call method when pressing backspace key
+        // SPACE BAR: Confirm changes and mark probe as complete
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            HandleSpaceBar();
+        }
+
+        // BACKSPACE KEY: Return to previous iteration or deselect probe
+        if (Input.GetKeyDown(KeyCode.Backspace))
         {
             HandleBackspaceKey();
         }
@@ -111,6 +119,68 @@ public class IterationManager : MonoBehaviour
             else
             {
                 AdvanceToIteration2(selectedIndex); // If the probe dot has never travelled to IT2, proceeds to spawn
+            }
+        }
+    }
+
+    // HELPER METHOD: Manages the interaction with the space bar
+    private void HandleSpaceBar()
+    {
+        if (probeDots == null) // Safety: Exit if probe dots don't exist
+        {
+            return;
+        }
+
+        if (currentIteration == 1)
+        {
+            // In IT1: Mark probe as completed and deselect
+            if (probeDots.selectedProbeIndex >= 0 && probeDots.selectedProbeIndex < probeDots.probes.Count)
+            {
+                GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+                Renderer renderer = selectedProbe.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                }
+                probeDots.selectedProbeIndex = -1; // Deselect the probe
+
+                // Exit focus mode if active
+                if (focusSystem != null)
+                {
+                    focusSystem.ExitFocusMode();
+                }
+            }
+        }
+        else if (currentIteration == 2)
+        {
+            // In IT2: Mark probe as completed, deselect, and return to IT2 selection screen
+            if (probeDots.selectedProbeIndex >= 0 && probeDots.selectedProbeIndex < probeDots.probes.Count)
+            {
+                GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+                Renderer renderer = selectedProbe.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                }
+                probeDots.selectedProbeIndex = -1; // Deselect the probe
+
+                // Exit focus mode if active
+                if (focusSystem != null)
+                {
+                    focusSystem.ExitFocusMode();
+                }
+            }
+        }
+    }
+
+    // HELPER METHOD: Manages the interaction with the backspace key
+    private void HandleBackspaceKey()
+    {
+        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
+        {
+            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
+            {
+                ReturnToIteration1();
             }
         }
     }
@@ -191,18 +261,6 @@ public class IterationManager : MonoBehaviour
 
         currentIteration = 2;
         currentParentProbeIndex = parentProbeIndex;
-    }
-
-    // HELPER METHOD: Manages the interaction with the backspace key
-    private void HandleBackspaceKey()
-    {
-        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
-        {
-            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
-            {
-                ReturnToIteration1();
-            }
-        }
     }
 
     // METHOD: Progress to iteration 2 after enter interaction

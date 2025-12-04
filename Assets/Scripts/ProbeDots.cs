@@ -2,6 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Input method for the dropdown in the Unity inspector
+
+public enum ProbeInputMethod
+{
+    Keyboard,
+    ViveTrackpad
+}
+
 // Manages probe dots within the application
 public class ProbeDots : MonoBehaviour
 {
@@ -10,6 +18,7 @@ public class ProbeDots : MonoBehaviour
     private ProbeDotConstraints constraints;
     private FocusSystem focusSystem;
     private IterationManager iterationManager;
+    private VRInputHandler vrInputHandler;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     internal float probeDotSize = 0.2f; // Size of each probe dot
@@ -24,7 +33,12 @@ public class ProbeDots : MonoBehaviour
     private Dictionary<int, List<int>> probeNeighbors = new Dictionary<int, List<int>>(); // Maps probe index to its neighbor indices
 
     // Variables for movement tracking
-    private bool isMoving = false; // Tracking about movement of probe
+    private bool isMoving = false;
+
+    // VR displacement settings
+    [SerializeField] private ProbeInputMethod inputMethod = ProbeInputMethod.Keyboard;
+    [SerializeField] private float vrMovementSpeed = 1.5f;
+    [SerializeField] private float vrSensitivity = 1.0f;
 
     // Initialization of all probe dot functionalities
     void Start()
@@ -53,8 +67,25 @@ public class ProbeDots : MonoBehaviour
         // Initialize iteration manager reference
         iterationManager = FindObjectOfType<IterationManager>();
 
+        // Initialize VR INPUT handler if required
+        InitializeVRInput();
+
         // Start coroutine to wait for grid points to be ready
         StartCoroutine(InitializeProbes());
+    }
+
+    private void InitializeVRInput()
+    {
+        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        {
+            vrInputHandler = FindObjectOfType<VRInputHandler>();
+
+            if (vrInputHandler == null)
+            {
+                GameObject vrInputObj = new GameObject("VRInputHandler");
+                vrInputHandler = vrInputObj.AddComponent<VRInputHandler>();
+            }
+        }
     }
 
     private IEnumerator InitializeProbes()
@@ -73,7 +104,6 @@ public class ProbeDots : MonoBehaviour
     {
         HandleKeyboardProbeSelection();
         HandleProbeMovement();
-        HandleKeys();
     }
 
     // METHOD: Creation of probes
@@ -206,20 +236,78 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
-    // METHOD: Handle probe movement based on arrow key input
+    // METHOD: Handle probe movement based on selected input method
     private void HandleProbeMovement()
     {
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
-    {
-        GameObject selectedProbe = probes[selectedProbeIndex];
-        Vector3 currentPosition = selectedProbe.transform.position;
-        Vector3 proposedPosition = currentPosition;
+        {
+            GameObject selectedProbe = probes[selectedProbeIndex];
+            Vector3 currentPosition = selectedProbe.transform.position;
+            Vector3 proposedPosition = currentPosition;
 
-        // Check if any arrow key is pressed
+            bool hasInput = false;
+            Vector3 inputDirection = Vector3.zero;
+
+            // CRITICAL: Choose ONLY ONE input method - block the other completely
+            if (inputMethod == ProbeInputMethod.ViveTrackpad)
+            {
+                // VR MODE: Only trackpad can displace probes - NO keyboard fallback
+                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable())
+                {
+                    // Controller available - use ONLY trackpad
+                    if (vrInputHandler.IsTrackpadTouched)
+                    {
+                        inputDirection = vrInputHandler.GetMovementDirection(vrSensitivity);
+                        hasInput = inputDirection.magnitude > 0.01f;
+
+                        if (hasInput)
+                        {
+                            float speed = vrMovementSpeed * Time.deltaTime;
+                            proposedPosition += inputDirection * speed;
+                        }
+                    }
+                }
+            }
+            
+            else if (inputMethod == ProbeInputMethod.Keyboard)
+            {
+                // KEYBOARD MODE: Only arrow keys can displace probes
+                hasInput = GetKeyboardDisplacementInput(ref inputDirection, ref proposedPosition, currentPosition);
+            }
+
+            // Apply movement if input was detected
+            if (hasInput)
+            {
+                if (!isMoving)
+                {
+                    isMoving = true;
+                }
+
+                proposedPosition.z = currentPosition.z;
+                
+                if (constraints != null)
+                {
+                    List<Vector3> neighborPositions = GetNeighborPositions(selectedProbeIndex);
+                    Vector3 initialPosition = probeInitialPositions[selectedProbe];
+                    proposedPosition = constraints.ApplyConstraints(proposedPosition, currentPosition, neighborPositions, initialPosition);
+                }
+
+                selectedProbe.transform.position = proposedPosition;
+            }
+            else
+            {
+                isMoving = false;
+            }
+        }
+    }
+
+    // METHOD: Obtain keyboard INPUT for displacement via arrow keys
+    private bool GetKeyboardDisplacementInput(ref Vector3 inputDirection, ref Vector3 proposedPosition, Vector3 currentPosition)
+    {
         bool hasInput = false;
         float speed = moveSpeed * Time.deltaTime;
 
-        Vector3 inputDirection = Vector3.zero;
+        inputDirection = Vector3.zero; // FIXED: Reset inputDirection at the start
 
         if (Input.GetKey(KeyCode.UpArrow))
         {
@@ -244,40 +332,15 @@ public class ProbeDots : MonoBehaviour
 
         if (hasInput)
         {
-            // Start movement tracking if not already moving
-            if (!isMoving)
-            {
-                isMoving = true;
-            }
-
-            // Normalize input direction to prevent faster diagonal movement
             if (inputDirection.magnitude > 1f)
             {
                 inputDirection.Normalize();
             }
 
-            // Apply free 2D movement
             proposedPosition += inputDirection * speed;
-
-            // Keep Z position consistent
-            proposedPosition.z = currentPosition.z;
-
-            // Apply constraints if the constraints component is available
-            if (constraints != null)
-            {
-                List<Vector3> neighborPositions = GetNeighborPositions(selectedProbeIndex);
-                Vector3 initialPosition = probeInitialPositions[selectedProbe];
-                proposedPosition = constraints.ApplyConstraints(proposedPosition, currentPosition, neighborPositions, initialPosition);
-            }
-
-            selectedProbe.transform.position = proposedPosition;
         }
-        else
-        {
-            // Reset movement tracking when no input
-            isMoving = false;
-        }
-        }
+
+        return hasInput;
     }
 
     // METHOD: Select a probe by index
@@ -303,30 +366,6 @@ public class ProbeDots : MonoBehaviour
             probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Completed;
         }
         selectedProbeIndex = -1;
-    }
-
-    private void HandleKeys()
-    {
-        // Space key: Complete/mark current probe as done and exit focus mode
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count) // Ensure that a probe is selected for completing the movement process
-            {
-                GameObject selectedProbe = probes[selectedProbeIndex];
-
-                // Reset movement state
-                isMoving = false;
-
-                selectedProbe.GetComponent<Renderer>().material.color = ProbeColors.Completed; // Change color to 'completed' state
-                selectedProbeIndex = -1; // Deselect probe
-
-                // Exit focus mode
-                if (focusSystem != null)
-                {
-                    focusSystem.ExitFocusMode();
-                }
-            }
-        }
     }
 
     //METHOD: Identify which probes are neighbors of each other based on their grid layout
@@ -376,5 +415,16 @@ public class ProbeDots : MonoBehaviour
         }
 
         return neighborPositions;
+    }
+
+    // METHOD: Change INPUT method at runtime
+    public void SetInputMethod(ProbeInputMethod method)
+    {
+        inputMethod = method; // FIXED: Changed from ProbeInputMethod = method
+
+        if (method == ProbeInputMethod.ViveTrackpad && vrInputHandler == null)
+        {
+            InitializeVRInput();
+        }
     }
 }
