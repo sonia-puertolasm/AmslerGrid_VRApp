@@ -17,7 +17,7 @@ public class GridRebuildManager : MonoBehaviour
     private Vector3[,] currentGridPoints;
 
     // Definition of displacement-related parameters
-    private Vector3[,] accumulatedDisplacement;
+    internal Vector3[,] accumulatedDisplacement;
     private Vector3[] lastProbePositions;
 
     // Creation of pool of horizontal and vertical lines for deformed grid
