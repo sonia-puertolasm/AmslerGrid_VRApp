@@ -23,6 +23,11 @@ public class IterationManager : MonoBehaviour
     public bool IsInIteration2 => currentIteration == 2;
     public int CurrentParentProbeIndex => currentParentProbeIndex;
 
+    // Public accessors for iteration probe data
+    public Dictionary<int, List<GameObject>> GetIterationProbes() => iterationProbes;
+    public Dictionary<int, List<GameObject>> GetParentProbeToIteration2Probes() => parentProbeToIteration2Probes;
+    public Dictionary<int, Dictionary<GameObject, Vector3>> GetParentProbeToIteration2Positions() => parentProbeToIteration2Positions;
+
     // Retrieval of specific grid parameters
     private int gridSize;
     private float cellSize;
