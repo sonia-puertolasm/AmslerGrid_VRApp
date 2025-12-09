@@ -37,7 +37,7 @@ public class GridRebuildManager : MonoBehaviour
     // Definition of grid-design specific parameters
     private float lineWidth = 0.15f;
     private Color lineColor = Color.white;
-
+ 
     // METHOD: Initialization of all grid-reconstruction methods
     void Start()
     {
