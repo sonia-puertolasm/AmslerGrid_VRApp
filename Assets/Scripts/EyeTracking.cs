@@ -6,6 +6,7 @@ public class EyeTracking : MonoBehaviour
 {
     private MainGrid mainGrid;
     private ProbeDots probeDots;
+    private GridRebuildManager gridRebuildManager;
 
     private GameObject gridLinesParent;
     private GameObject gridPointsParent;
@@ -14,10 +15,16 @@ public class EyeTracking : MonoBehaviour
     public bool hideAllExceptCenter = false;
     private bool previousHideState = false;
 
+    private Dictionary<GameObject, bool> originalProbeStates = new Dictionary<GameObject, bool>();
+    private Dictionary<GameObject, bool> originalProbeRendererStates = new Dictionary<GameObject, bool>();
+    private Dictionary<GameObject, bool> originalGridPointStates = new Dictionary<GameObject, bool>();
+    private Dictionary<LineRenderer, bool> originalLineRendererStates = new Dictionary<LineRenderer, bool>();
+
     void Start()
     {
         mainGrid = FindObjectOfType<MainGrid>();
         probeDots = FindObjectOfType<ProbeDots>();
+        gridRebuildManager = FindObjectOfType<GridRebuildManager>();
 
         StartCoroutine(InitializeReferences());
     }
@@ -47,7 +54,7 @@ public class EyeTracking : MonoBehaviour
             }
         }
 
-        UpdateVisibility();
+        CaptureOriginalStates();
     }
 
     void Update()
@@ -59,68 +66,216 @@ public class EyeTracking : MonoBehaviour
         }
     }
 
+    private void CaptureOriginalStates()
+    {
+        if (probeDots != null && probeDots.probes != null)
+        {
+            foreach (GameObject probe in probeDots.probes)
+            {
+                if (probe != null)
+                {
+                    originalProbeStates[probe] = probe.activeSelf;
+                    Renderer renderer = probe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        originalProbeRendererStates[probe] = renderer.enabled;
+                    }
+                }
+            }
+        }
+
+        if (gridPointsParent != null)
+        {
+            foreach (Transform child in gridPointsParent.transform)
+            {
+                if (child.gameObject != centerFixationPoint)
+                {
+                    originalGridPointStates[child.gameObject] = child.gameObject.activeSelf;
+                }
+            }
+        }
+
+        if (gridRebuildManager != null)
+        {
+            foreach (LineRenderer lr in gridRebuildManager.horizontalLinePool)
+            {
+                if (lr != null)
+                {
+                    originalLineRendererStates[lr] = lr.enabled;
+                }
+            }
+            foreach (LineRenderer lr in gridRebuildManager.verticalLinePool)
+            {
+                if (lr != null)
+                {
+                    originalLineRendererStates[lr] = lr.enabled;
+                }
+            }
+        }
+    }
+
     private void UpdateVisibility()
     {
         if (hideAllExceptCenter)
         {
-            if (gridLinesParent != null)
-            {
-                gridLinesParent.SetActive(false);
-            }
-
-            if (probeDots != null && probeDots.probes != null)
-            {
-                foreach (GameObject probe in probeDots.probes)
-                {
-                    if (probe != null)
-                    {
-                        probe.SetActive(false);
-                    }
-                }
-            }
-
-            if (gridPointsParent != null)
-            {
-                foreach (Transform child in gridPointsParent.transform)
-                {
-                    if (child.gameObject != centerFixationPoint)
-                    {
-                        child.gameObject.SetActive(false);
-                    }
-                }
-            }
-
-            if (centerFixationPoint != null)
-            {
-                centerFixationPoint.SetActive(true);
-            }
+            HideAllExceptCenter();
         }
         else
         {
-            if (gridLinesParent != null)
-            {
-                gridLinesParent.SetActive(true);
-            }
+            RestoreVisibility();
+        }
+    }
 
-            if (probeDots != null && probeDots.probes != null)
+    private void HideAllExceptCenter()
+    {
+        CaptureOriginalStates();
+
+        if (gridLinesParent != null)
+        {
+            gridLinesParent.SetActive(false);
+        }
+
+        if (gridRebuildManager != null)
+        {
+            foreach (LineRenderer lr in gridRebuildManager.horizontalLinePool)
             {
-                foreach (GameObject probe in probeDots.probes)
+                if (lr != null)
                 {
-                    if (probe != null)
+                    lr.enabled = false;
+                }
+            }
+            foreach (LineRenderer lr in gridRebuildManager.verticalLinePool)
+            {
+                if (lr != null)
+                {
+                    lr.enabled = false;
+                }
+            }
+        }
+
+        if (probeDots != null && probeDots.probes != null)
+        {
+            foreach (GameObject probe in probeDots.probes)
+            {
+                if (probe != null)
+                {
+                    Renderer renderer = probe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        renderer.enabled = false;
+                    }
+                    probe.SetActive(false);
+                }
+            }
+        }
+
+        if (gridPointsParent != null)
+        {
+            foreach (Transform child in gridPointsParent.transform)
+            {
+                if (child.gameObject != centerFixationPoint)
+                {
+                    child.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        if (centerFixationPoint != null)
+        {
+            centerFixationPoint.SetActive(true);
+            Renderer centerRenderer = centerFixationPoint.GetComponent<Renderer>();
+            if (centerRenderer != null)
+            {
+                centerRenderer.enabled = true;
+            }
+        }
+    }
+
+    private void RestoreVisibility()
+    {
+        if (gridLinesParent != null)
+        {
+            gridLinesParent.SetActive(true);
+        }
+
+        if (gridRebuildManager != null)
+        {
+            foreach (LineRenderer lr in gridRebuildManager.horizontalLinePool)
+            {
+                if (lr != null && originalLineRendererStates.ContainsKey(lr))
+                {
+                    lr.enabled = originalLineRendererStates[lr];
+                }
+            }
+            foreach (LineRenderer lr in gridRebuildManager.verticalLinePool)
+            {
+                if (lr != null && originalLineRendererStates.ContainsKey(lr))
+                {
+                    lr.enabled = originalLineRendererStates[lr];
+                }
+            }
+        }
+
+        if (probeDots != null && probeDots.probes != null)
+        {
+            foreach (GameObject probe in probeDots.probes)
+            {
+                if (probe != null)
+                {
+                    if (originalProbeStates.ContainsKey(probe))
+                    {
+                        probe.SetActive(originalProbeStates[probe]);
+                    }
+                    else
                     {
                         probe.SetActive(true);
                     }
+
+                    Renderer renderer = probe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        if (originalProbeRendererStates.ContainsKey(probe))
+                        {
+                            renderer.enabled = originalProbeRendererStates[probe];
+                        }
+                        else
+                        {
+                            renderer.enabled = true;
+                        }
+                    }
                 }
             }
+        }
 
-            if (gridPointsParent != null)
+        if (gridPointsParent != null)
+        {
+            foreach (Transform child in gridPointsParent.transform)
             {
-                foreach (Transform child in gridPointsParent.transform)
+                if (originalGridPointStates.ContainsKey(child.gameObject))
+                {
+                    child.gameObject.SetActive(originalGridPointStates[child.gameObject]);
+                }
+                else
                 {
                     child.gameObject.SetActive(true);
                 }
             }
         }
+
+        if (gridRebuildManager != null)
+        {
+            gridRebuildManager.ForceRebuild();
+        }
+
+        ClearStoredStates();
+    }
+
+    private void ClearStoredStates()
+    {
+        originalProbeStates.Clear();
+        originalProbeRendererStates.Clear();
+        originalGridPointStates.Clear();
+        originalLineRendererStates.Clear();
     }
 
     public void SetHideAllExceptCenter(bool hideState)
