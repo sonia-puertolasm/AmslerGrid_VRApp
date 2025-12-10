@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class EyeTracking : MonoBehaviour
 {
+    // Definition of GOs of interest
     private MainGrid mainGrid;
     private ProbeDots probeDots;
     private GridRebuildManager gridRebuildManager;
@@ -12,17 +13,23 @@ public class EyeTracking : MonoBehaviour
     private ProbeDotConstraints constraintManager;
     private DisplacementTracker displacementTracker;
 
+    // Definition of center fixation point
     private GameObject centerFixationPoint;
     private Transform centerOriginalParent;
 
+    // Definition of GO-hiding variable
     private bool hideAllExceptCenter = false;
+
+    // Definition of grace period parameters
     private float startupGracePeriod = 5f;
     private float startupTimer = 0f;
     private bool isGracePeriodActive = true;
 
+    // Definition of eye tracking specific parameters
     private EyeTrackingToolbox eyetracker;
     public float gazeThresholdAngle;
 
+    // Initialization of all methods
     void Start()
     {
         mainGrid = FindObjectOfType<MainGrid>();
@@ -37,13 +44,14 @@ public class EyeTracking : MonoBehaviour
         StartCoroutine(InitializeReferences());
     }
 
+    // METHOD: Coroutine for delaying eye tracking until initialization of all scene objects
     private IEnumerator InitializeReferences()
     {
         yield return new WaitForEndOfFrame();
 
-        if (mainGrid != null)
+        if (mainGrid != null) // Safety: Proceeds if the main grid exists
         {
-            Transform centerTransform = mainGrid.transform.Find("GridPoints/CenterFixationPoint");
+            Transform centerTransform = mainGrid.transform.Find("GridPoints/CenterFixationPoint"); // Look for center fixation point as a reference
             if (centerTransform != null)
             {
                 centerFixationPoint = centerTransform.gameObject;
@@ -52,11 +60,12 @@ public class EyeTracking : MonoBehaviour
         }
     }
 
+    // METHOD: Once per rendered frame the main eye tracking functionality is performed
     void LateUpdate()
     {
         if (eyetracker == null) return;
 
-        if (isGracePeriodActive)
+        if (isGracePeriodActive) // Enforcing of grace period
         {
             startupTimer += Time.deltaTime;
             if (startupTimer >= startupGracePeriod)
@@ -66,10 +75,9 @@ public class EyeTracking : MonoBehaviour
             return;
         }
 
-        GazeData gaze = eyetracker.GetGazeData();
+        GazeData gaze = eyetracker.GetGazeData(); // Extraction of gaze-related information
 
-        Debug.Log("Gaze Direction: " + gaze.combinedRayLocal.direction + " Angle with Forward: " + Vector3.Angle(Vector3.forward, gaze.combinedRayLocal.direction));
-        if (Vector3.Angle(Vector3.forward, gaze.combinedRayLocal.direction) < gazeThresholdAngle)
+        if (Vector3.Angle(Vector3.forward, gaze.combinedRayLocal.direction) < gazeThresholdAngle) // If the angle of the gaze is below the threshold, all GOs are still visualizable. Otherwise, everything is hidden.
         {
             SetHideAllExceptCenter(false);
         }
@@ -79,14 +87,15 @@ public class EyeTracking : MonoBehaviour
         }
     }
 
+    // METHOD: Sets the hiding status for posteriously hiding all GOs (exc. center fixation point)
     private void SetHideAllExceptCenter(bool hideState)
     {
-        if (hideAllExceptCenter == hideState)
+        if (hideAllExceptCenter == hideState) // Safety: Early exit in case the status = hide
             return;
 
-        hideAllExceptCenter = hideState;
+        hideAllExceptCenter = hideState; // Status = hide
 
-        if (hideAllExceptCenter)
+        if (hideAllExceptCenter) // If status = hide
         {
             HideAllExceptCenter();
         }
@@ -96,6 +105,7 @@ public class EyeTracking : MonoBehaviour
         }
     }
 
+    // METHOD: Hides all GOs except center fixation point while safety-checking that ALL GOs exist
     private void HideAllExceptCenter()
     {
         if (centerFixationPoint != null && centerOriginalParent != null)
@@ -139,6 +149,7 @@ public class EyeTracking : MonoBehaviour
         }
     }
 
+    // METHOD: Restores visibility of all GOs except center fixation point while safety-checking that ALL GOs exist
     private void ShowAllElements()
     {
         if (mainGrid != null)

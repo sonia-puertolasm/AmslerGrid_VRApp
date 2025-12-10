@@ -362,7 +362,7 @@ GameObject:
   - component: {fileID: 390051647}
   - component: {fileID: 390051648}
   m_Layer: 0
-  m_Name: Focus Manager
+  m_Name: Focus System
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
