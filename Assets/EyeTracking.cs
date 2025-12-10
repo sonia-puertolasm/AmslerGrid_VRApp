@@ -132,6 +132,11 @@ public class EyeTracking : MonoBehaviour
         {
             displacementTracker.gameObject.SetActive(false);
         }
+
+        if (focusSystem != null)
+        {
+            focusSystem.gameObject.SetActive(false);
+        }
     }
 
     private void ShowAllElements()
@@ -170,6 +175,11 @@ public class EyeTracking : MonoBehaviour
         if (centerFixationPoint != null && centerOriginalParent != null)
         {
             centerFixationPoint.transform.SetParent(centerOriginalParent);
+        }
+
+        if (focusSystem != null)
+        {
+            focusSystem.gameObject.setActive(true);
         }
     }
 }
