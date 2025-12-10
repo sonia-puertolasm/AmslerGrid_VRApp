@@ -179,7 +179,7 @@ public class EyeTracking : MonoBehaviour
 
         if (focusSystem != null)
         {
-            focusSystem.gameObject.setActive(true);
+            focusSystem.gameObject.SetActive(true);
         }
     }
 }
