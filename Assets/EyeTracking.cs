@@ -9,6 +9,8 @@ public class EyeTracking : MonoBehaviour
     private GridRebuildManager gridRebuildManager;
     private FocusSystem focusSystem;
     private GameObject centerFixationPoint;
+    private GameObject gridLinesParent;
+    private GameObject probesParent;
 
     private bool hideAllExceptCenter = false;
 
@@ -37,6 +39,17 @@ public class EyeTracking : MonoBehaviour
             {
                 centerFixationPoint = centerTransform.gameObject;
             }
+
+            Transform gridLinesTransform = mainGrid.transform.Find("GridLines");
+            if (gridLinesTransform != null)
+            {
+                gridLinesParent = gridLinesTransform.gameObject;
+            }
+        }
+
+        if (probeDots != null)
+        {
+            probesParent = probeDots.gameObject;
         }
     }
 
@@ -81,61 +94,43 @@ public class EyeTracking : MonoBehaviour
             focusSystem.ExitFocusMode();
         }
 
-        LineRenderer[] allLines = FindObjectsOfType<LineRenderer>();
-        foreach (LineRenderer lr in allLines)
+        // Disable grid lines parent
+        if (gridLinesParent != null)
         {
-            if (lr != null)
-                lr.enabled = false;
+            gridLinesParent.SetActive(false);
         }
 
-        if (probeDots != null && probeDots.probes != null)
+        // Disable probes parent (all probes will be hidden)
+        if (probesParent != null)
         {
-            foreach (GameObject probe in probeDots.probes)
-            {
-                if (probe != null && probe != centerFixationPoint)
-                {
-                    Renderer renderer = probe.GetComponent<Renderer>();
-                    if (renderer != null)
-                        renderer.enabled = false;
-                }
-            }
+            probesParent.SetActive(false);
         }
 
+        // Ensure center fixation point remains visible
         if (centerFixationPoint != null)
         {
-            Renderer centerRenderer = centerFixationPoint.GetComponent<Renderer>();
-            if (centerRenderer != null)
-                centerRenderer.enabled = true;
+            centerFixationPoint.SetActive(true);
         }
     }
 
     private void ShowAllElements()
     {
-        LineRenderer[] allLines = FindObjectsOfType<LineRenderer>(true);
-        foreach (LineRenderer lr in allLines)
+        // Enable grid lines parent
+        if (gridLinesParent != null)
         {
-            if (lr != null)
-                lr.enabled = true;
+            gridLinesParent.SetActive(true);
         }
 
-        if (probeDots != null && probeDots.probes != null)
+        // Enable probes parent (all probes will be shown)
+        if (probesParent != null)
         {
-            foreach (GameObject probe in probeDots.probes)
-            {
-                if (probe != null)
-                {
-                    Renderer renderer = probe.GetComponent<Renderer>();
-                    if (renderer != null)
-                        renderer.enabled = true;
-                }
-            }
+            probesParent.SetActive(true);
         }
 
+        // Ensure center fixation point remains visible
         if (centerFixationPoint != null)
         {
-            Renderer centerRenderer = centerFixationPoint.GetComponent<Renderer>();
-            if (centerRenderer != null)
-                centerRenderer.enabled = true;
+            centerFixationPoint.SetActive(true);
         }
 
         if (gridRebuildManager != null)
