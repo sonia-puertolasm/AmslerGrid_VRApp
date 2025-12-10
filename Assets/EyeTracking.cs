@@ -8,10 +8,11 @@ public class EyeTracking : MonoBehaviour
     private ProbeDots probeDots;
     private GridRebuildManager gridRebuildManager;
     private FocusSystem focusSystem;
+    private IterationManager iterationManager;
+    private ProbeDotConstraints constraintManager;
+    private DisplacementTracker displacementTracker;
+
     private GameObject centerFixationPoint;
-    private GameObject gridLinesParent;
-    private GameObject gridPointsParent;
-    private GameObject probesParent;
     private Transform centerOriginalParent;
 
     private bool hideAllExceptCenter = false;
@@ -25,6 +26,9 @@ public class EyeTracking : MonoBehaviour
         probeDots = FindObjectOfType<ProbeDots>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
         focusSystem = FindObjectOfType<FocusSystem>();
+        iterationManager = FindObjectOfType<IterationManager>();
+        constraintManager = FindObjectOfType<ProbeDotConstraints>();
+        displacementTracker = FindObjectOfType<DisplacementTracker>();
         eyetracker = GetComponent<EyeTrackingToolbox>();
 
         StartCoroutine(InitializeReferences());
@@ -42,23 +46,6 @@ public class EyeTracking : MonoBehaviour
                 centerFixationPoint = centerTransform.gameObject;
                 centerOriginalParent = centerTransform.parent;
             }
-
-            Transform gridLinesTransform = mainGrid.transform.Find("GridLines");
-            if (gridLinesTransform != null)
-            {
-                gridLinesParent = gridLinesTransform.gameObject;
-            }
-
-            Transform gridPointsTransform = mainGrid.transform.Find("GridPoints");
-            if (gridPointsTransform != null)
-            {
-                gridPointsParent = gridPointsTransform.gameObject;
-            }
-        }
-
-        if (probeDots != null)
-        {
-            probesParent = probeDots.gameObject;
         }
     }
 
@@ -108,47 +95,73 @@ public class EyeTracking : MonoBehaviour
             centerFixationPoint.transform.SetParent(null);
         }
 
-        if (gridLinesParent != null)
+        if (mainGrid != null)
         {
-            gridLinesParent.SetActive(false);
+            mainGrid.gameObject.SetActive(false);
         }
 
-        if (gridPointsParent != null)
+        if (probeDots != null)
         {
-            gridPointsParent.SetActive(false);
+            probeDots.gameObject.SetActive(false);
         }
 
-        if (probesParent != null)
+        if (gridRebuildManager != null)
         {
-            probesParent.SetActive(false);
+            gridRebuildManager.gameObject.SetActive(false);
+        }
+
+        if (iterationManager != null)
+        {
+            iterationManager.gameObject.SetActive(false);
+        }
+
+        if (constraintManager != null)
+        {
+            constraintManager.gameObject.SetActive(false);
+        }
+
+        if (displacementTracker != null)
+        {
+            displacementTracker.gameObject.SetActive(false);
         }
     }
 
     private void ShowAllElements()
     {
-        if (gridPointsParent != null)
+        if (mainGrid != null)
         {
-            gridPointsParent.SetActive(true);
+            mainGrid.gameObject.SetActive(true);
+        }
+
+        if (probeDots != null)
+        {
+            probeDots.gameObject.SetActive(true);
+        }
+
+        if (gridRebuildManager != null)
+        {
+            gridRebuildManager.gameObject.SetActive(true);
+            gridRebuildManager.ForceRebuild();
+        }
+
+        if (iterationManager != null)
+        {
+            iterationManager.gameObject.SetActive(true);
+        }
+
+        if (constraintManager != null)
+        {
+            constraintManager.gameObject.SetActive(true);
+        }
+
+        if (displacementTracker != null)
+        {
+            displacementTracker.gameObject.SetActive(true);
         }
 
         if (centerFixationPoint != null && centerOriginalParent != null)
         {
             centerFixationPoint.transform.SetParent(centerOriginalParent);
-        }
-
-        if (gridLinesParent != null)
-        {
-            gridLinesParent.SetActive(true);
-        }
-
-        if (probesParent != null)
-        {
-            probesParent.SetActive(true);
-        }
-
-        if (gridRebuildManager != null)
-        {
-            gridRebuildManager.ForceRebuild();
         }
     }
 }
