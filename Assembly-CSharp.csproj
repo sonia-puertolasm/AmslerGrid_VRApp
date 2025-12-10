@@ -60,18 +60,21 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.19f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\Scripts\EyeTracking.cs" />
+    <Compile Include="Assets\EyeTracking\EyeTrackers\DummyEyeTracker.cs" />
     <Compile Include="Assets\Scripts\IterationManager.cs" />
     <Compile Include="Assets\Scripts\VRInputManager.cs" />
-    <Compile Include="Assets\Scripts\Old\IAGFocusSystem.cs" />
+    <Compile Include="Assets\EyeTracking\EyeTrackers\ViveEyeTracker.cs" />
+    <Compile Include="Assets\EyeTracking.cs" />
     <Compile Include="Assets\Scripts\ProbeDotConstraints.cs" />
+    <Compile Include="Assets\EyeTracking\EyeTrackingEvent.cs" />
     <Compile Include="Assets\Scripts\ProbeDots.cs" />
     <Compile Include="Assets\Scripts\ProbeColors.cs" />
     <Compile Include="Assets\Scripts\FocusSystem.cs" />
-    <Compile Include="Assets\Scripts\Old\GridSpawn_Old.cs" />
+    <Compile Include="Assets\EyeTracking\IEyeTracker.cs" />
+    <Compile Include="Assets\EyeTracking\GazeDebugger.cs" />
+    <Compile Include="Assets\EyeTracking\EyeTrackingToolbox.cs" />
     <Compile Include="Assets\Scripts\DisplacementTracker.cs" />
     <Compile Include="Assets\Scripts\GridRebuildManager.cs" />
-    <Compile Include="Assets\Scripts\Old\DisplacementTracker_Old.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>

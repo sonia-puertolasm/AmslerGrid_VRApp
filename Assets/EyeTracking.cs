@@ -13,7 +13,7 @@ public class EyeTracking : MonoBehaviour
     private bool hideAllExceptCenter = false;
 
     private EyeTrackingToolbox eyetracker;
-    public float gazeThresholdAngle = 5f;
+    public float gazeThresholdAngle;
 
     void Start()
     {
