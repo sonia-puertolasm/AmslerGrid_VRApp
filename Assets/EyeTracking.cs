@@ -16,6 +16,9 @@ public class EyeTracking : MonoBehaviour
     private Transform centerOriginalParent;
 
     private bool hideAllExceptCenter = false;
+    private float startupGracePeriod = 5f;
+    private float startupTimer = 0f;
+    private bool isGracePeriodActive = true;
 
     private EyeTrackingToolbox eyetracker;
     public float gazeThresholdAngle;
@@ -53,6 +56,16 @@ public class EyeTracking : MonoBehaviour
     {
         if (eyetracker == null) return;
 
+        if (isGracePeriodActive)
+        {
+            startupTimer += Time.deltaTime;
+            if (startupTimer >= startupGracePeriod)
+            {
+                isGracePeriodActive = false;
+            }
+            return;
+        }
+
         GazeData gaze = eyetracker.GetGazeData();
 
         Debug.Log("Gaze Direction: " + gaze.combinedRayLocal.direction + " Angle with Forward: " + Vector3.Angle(Vector3.forward, gaze.combinedRayLocal.direction));
@@ -85,11 +98,6 @@ public class EyeTracking : MonoBehaviour
 
     private void HideAllExceptCenter()
     {
-        if (focusSystem != null)
-        {
-            focusSystem.ExitFocusMode();
-        }
-
         if (centerFixationPoint != null && centerOriginalParent != null)
         {
             centerFixationPoint.transform.SetParent(null);
