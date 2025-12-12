@@ -101,10 +101,22 @@ public class ProbeDots : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update() 
+    void Update()
     {
+        // Numpad selection works in BOTH modes
         HandleKeyboardProbeSelection();
-        HandleProbeMovement();
+
+        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        {
+            // VR MODE: Controller input for completion and movement
+            HandleVRTriggerComplete(); // Handle VR trigger for marking probe complete
+            HandleProbeMovement();
+        }
+        else
+        {
+            // KEYBOARD MODE: Keyboard movement only
+            HandleProbeMovement();
+        }
     }
 
     // METHOD: Creation of probes
@@ -237,6 +249,36 @@ public class ProbeDots : MonoBehaviour
         }
     }
 
+    // METHOD: Handle VR trigger for marking probe complete (same as Space bar)
+    private void HandleVRTriggerComplete()
+    {
+        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        {
+            if (vrInputHandler != null && vrInputHandler.TriggerPressed)
+            {
+                // Mark probe as complete (same logic as Space bar)
+                if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
+                {
+                    GameObject selectedProbe = probes[selectedProbeIndex];
+                    Renderer renderer = selectedProbe.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                    }
+                    selectedProbeIndex = -1; // Deselect the probe
+
+                    // Exit focus mode if active
+                    if (focusSystem != null)
+                    {
+                        focusSystem.ExitFocusMode();
+                    }
+
+                    Debug.Log("VR Trigger: Marked probe as complete");
+                }
+            }
+        }
+    }
+
     // METHOD: Handle probe movement based on selected input method
     private void HandleProbeMovement()
     {
@@ -255,7 +297,7 @@ public class ProbeDots : MonoBehaviour
             {
                 if (vrInputHandler != null && vrInputHandler.IsControllerAvailable()) // Verification of the INPUT system being ready
                 {
-                    if (vrInputHandler.IsTrackpadTouched)
+                    if (vrInputHandler.IsTrackpadPressed)
                     {
                         inputDirection = vrInputHandler.GetMovementDirection(vrSensitivity);
                         hasInput = inputDirection.magnitude > 0.01f;
@@ -426,5 +468,11 @@ public class ProbeDots : MonoBehaviour
         {
             InitializeVRInput();
         }
+    }
+
+    // METHOD: Get current input method
+    public ProbeInputMethod GetInputMethod()
+    {
+        return inputMethod;
     }
 }
