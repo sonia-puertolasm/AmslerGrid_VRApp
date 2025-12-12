@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.XR;
 
@@ -36,7 +35,6 @@ public class VRInputHandler : MonoBehaviour
     // METHOD: Identifies a usable XR controller each frame
     private void InitializeController()
     {
-
         // Right controller
 
         InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
@@ -62,7 +60,7 @@ public class VRInputHandler : MonoBehaviour
         }
 
         controllerFound = false;
-        Debug.Log("Controller NOT detected");
+        Debug.Log("Controller detected");
     }
 
     // METHOD: Reads input of the trackpad
