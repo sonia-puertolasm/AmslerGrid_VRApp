@@ -100,7 +100,8 @@ public class ProbeDots : MonoBehaviour
         IdentifyProbeNeighbors(); // Identify which probes are neighbors of each other
     }
 
-    void Update() // Update is called once per frame
+    // Update is called once per frame
+    void Update() 
     {
         HandleKeyboardProbeSelection();
         HandleProbeMovement();
@@ -248,13 +249,12 @@ public class ProbeDots : MonoBehaviour
             bool hasInput = false;
             Vector3 inputDirection = Vector3.zero;
 
-            // CRITICAL: Choose ONLY ONE input method - block the other completely
+            // Vive Trackpad displacement method
+
             if (inputMethod == ProbeInputMethod.ViveTrackpad)
             {
-                // VR MODE: Only trackpad can displace probes - NO keyboard fallback
-                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable())
+                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable()) // Verification of the INPUT system being ready
                 {
-                    // Controller available - use ONLY trackpad
                     if (vrInputHandler.IsTrackpadTouched)
                     {
                         inputDirection = vrInputHandler.GetMovementDirection(vrSensitivity);
@@ -269,13 +269,13 @@ public class ProbeDots : MonoBehaviour
                 }
             }
             
+            // Keyboard displacement method
+
             else if (inputMethod == ProbeInputMethod.Keyboard)
             {
-                // KEYBOARD MODE: Only arrow keys can displace probes
                 hasInput = GetKeyboardDisplacementInput(ref inputDirection, ref proposedPosition, currentPosition);
             }
 
-            // Apply movement if input was detected
             if (hasInput)
             {
                 if (!isMoving)
