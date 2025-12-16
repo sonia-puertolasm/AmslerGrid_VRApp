@@ -11,6 +11,7 @@ public class IterationManager : MonoBehaviour
     private GridRebuildManager gridRebuildManager;
     private DisplacementTracker displacementTracker;
     private FocusSystem focusSystem;
+    private VRInputHandler vrInputHandler;
 
     // Definition of iteration configuration parameters and dictionaries
     private int currentIteration = 1;
@@ -22,6 +23,11 @@ public class IterationManager : MonoBehaviour
     public int CurrentIteration => currentIteration;
     public bool IsInIteration2 => currentIteration == 2;
     public int CurrentParentProbeIndex => currentParentProbeIndex;
+
+    // Public accessors for iteration probe data
+    public Dictionary<int, List<GameObject>> GetIterationProbes() => iterationProbes;
+    public Dictionary<int, List<GameObject>> GetParentProbeToIteration2Probes() => parentProbeToIteration2Probes;
+    public Dictionary<int, Dictionary<GameObject, Vector3>> GetParentProbeToIteration2Positions() => parentProbeToIteration2Positions;
 
     // Retrieval of specific grid parameters
     private int gridSize;
@@ -37,6 +43,7 @@ public class IterationManager : MonoBehaviour
         mainGrid = FindObjectOfType<MainGrid>();
         gridRebuildManager = FindObjectOfType<GridRebuildManager>();
         focusSystem = FindObjectOfType<FocusSystem>();
+        vrInputHandler = FindObjectOfType<VRInputHandler>();
 
         if (mainGrid != null) // Safety: Check if the main grid element exists before proceeding
         {
@@ -85,32 +92,126 @@ public class IterationManager : MonoBehaviour
 
     void Update() // Update is called once per frame
     {
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        bool isVRMode = (probeDots != null && probeDots.GetInputMethod() == ProbeInputMethod.ViveTrackpad); // Verifies in which mode are we (VR Controller or Keyboard)
+
+        if (isVRMode)
         {
-            HandleEnterKey(); // Call method when pressing return key
+            HandleVRControllerInput();
+        }
+        else
+        {
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                HandleEnterKey();
+            }
+
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                HandleSpaceBar();
+            }
+
+            if (Input.GetKeyDown(KeyCode.Backspace))
+            {
+                HandleBackspaceKey();
+            }
+        }
+    }
+
+
+    // METHOD: Handle VR controller input for iteration navigation
+    private void HandleVRControllerInput()
+    {
+        if (vrInputHandler == null || !vrInputHandler.IsControllerAvailable())
+            return;
+
+        if (vrInputHandler.GripPressed)
+        {
+            HandleEnterKey();
         }
 
-        if (Input.GetKeyDown(KeyCode.Backspace)) // Call method when pressing backspace key
+        if (vrInputHandler.MenuPressed)
         {
             HandleBackspaceKey();
         }
     }
-
     // HELPER METHOD: Manages the interaction given enter key engagement
     private void HandleEnterKey()
     {
-        if (currentIteration == 1 && probeDots != null && probeDots.selectedProbeIndex >= 0) // Safety: Ensures the iteration is correct and the probe dots exist
-        {
-            int selectedIndex = probeDots.selectedProbeIndex; 
 
-            if (parentProbeToIteration2Probes.ContainsKey(selectedIndex) && 
-                parentProbeToIteration2Probes[selectedIndex].Count > 0) // If that probe dot has already travelled to IT2, re-shows 
+        if (currentIteration == 1 && probeDots != null && probeDots.selectedProbeIndex >= 0)
+        {
+            int selectedIndex = probeDots.selectedProbeIndex;
+
+            if (parentProbeToIteration2Probes.ContainsKey(selectedIndex) &&
+                parentProbeToIteration2Probes[selectedIndex].Count > 0)
             {
                 ReturnToIteration2(selectedIndex);
             }
             else
             {
-                AdvanceToIteration2(selectedIndex); // If the probe dot has never travelled to IT2, proceeds to spawn
+                AdvanceToIteration2(selectedIndex);
+            }
+        }
+    }
+
+    // HELPER METHOD: Manages the interaction with the space bar
+    private void HandleSpaceBar()
+    {
+        if (probeDots == null) // Safety: Exit if probe dots don't exist
+        {
+            return;
+        }
+
+        if (currentIteration == 1)
+        {
+            // In IT1: Mark probe as completed and deselect
+            if (probeDots.selectedProbeIndex >= 0 && probeDots.selectedProbeIndex < probeDots.probes.Count)
+            {
+                GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+                Renderer renderer = selectedProbe.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                }
+                probeDots.selectedProbeIndex = -1; // Deselect the probe
+
+                // Exit focus mode if active
+                if (focusSystem != null)
+                {
+                    focusSystem.ExitFocusMode();
+                }
+            }
+        }
+        else if (currentIteration == 2)
+        {
+            // In IT2: Mark probe as completed, deselect, and return to IT2 selection screen
+            if (probeDots.selectedProbeIndex >= 0 && probeDots.selectedProbeIndex < probeDots.probes.Count)
+            {
+                GameObject selectedProbe = probeDots.probes[probeDots.selectedProbeIndex];
+                Renderer renderer = selectedProbe.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                }
+                probeDots.selectedProbeIndex = -1; // Deselect the probe
+
+                // Exit focus mode if active
+                if (focusSystem != null)
+                {
+                    focusSystem.ExitFocusMode();
+                }
+            }
+        }
+    }
+
+    // HELPER METHOD: Manages the interaction with the backspace key
+    private void HandleBackspaceKey()
+    {
+        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
+        {
+            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
+            {
+                ReturnToIteration1();
             }
         }
     }
@@ -191,18 +292,6 @@ public class IterationManager : MonoBehaviour
 
         currentIteration = 2;
         currentParentProbeIndex = parentProbeIndex;
-    }
-
-    // HELPER METHOD: Manages the interaction with the backspace key
-    private void HandleBackspaceKey()
-    {
-        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
-        {
-            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
-            {
-                ReturnToIteration1();
-            }
-        }
     }
 
     // METHOD: Progress to iteration 2 after enter interaction

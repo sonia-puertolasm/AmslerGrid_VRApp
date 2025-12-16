@@ -1,0 +1,185 @@
+using UnityEngine;
+using UnityEngine.XR;
+
+public class VRInputHandler : MonoBehaviour
+{
+    // VR controller state specific properties
+    private InputDevice activeController;
+    private bool controllerFound = false;
+
+    // Trackpad state specific properties
+    public Vector2 TrackpadInput { get; private set; }
+    public bool IsTrackpadPressed { get; private set; } // CHANGED: From IsTrackpadTouched to IsTrackpadPressed
+    
+    // Button state properties
+    public bool TriggerPressed { get; private set; }
+    public bool GripPressed { get; private set; }
+    public bool MenuPressed { get; private set; }
+    
+    // Fine-tuning specific properties for controller use
+    private float deadzone = 0.15f; // Threshold to ignore tiny axis movements possible from the trackpad
+    private float smoothing = 0.7f; // Dampening factor for steadier motion
+    private Vector2 smoothedInput; // Vector for smoothing of input
+
+    // State tracking for button detection
+    private bool triggerWasPressed = false;
+    private bool gripWasPressed = false;
+    private bool menuWasPressed = false;
+
+    // Initialization of all methods
+    void Start()
+    {
+        InitializeController();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (!controllerFound)
+        {
+            InitializeController();
+        }
+        ReadTrackpadInput();
+        ReadTriggerInput();
+        ReadGripInput();
+        ReadMenuInput();
+    }
+
+    // METHOD: Identifies a usable XR controller each frame
+    private void InitializeController()
+    {
+        // Right controller
+        InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+        
+        if (rightController.isValid)
+        {
+            activeController = rightController;
+            controllerFound = true;
+            Debug.Log("VR Input: Controller detected (RIGHT)");
+            return;
+        }
+
+        // Left controller
+        InputDevice leftController = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+        
+        if (leftController.isValid)
+        {
+            activeController = leftController;
+            controllerFound = true;
+            Debug.Log("VR Input: Controller detected (LEFT)");
+            return;
+        }
+
+        controllerFound = false;
+    }
+
+    // METHOD: Reads input of the trackpad (PRESS, not touch)
+    private void ReadTrackpadInput()
+    {
+        if (!controllerFound || !activeController.isValid) // Safety: Returns early if no controller 
+            return;
+
+        // Check if trackpad is PRESSED (clicked)
+        bool pressed;
+        if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out pressed))
+        {
+            IsTrackpadPressed = pressed;
+        }
+
+        // Only read trackpad position if it's pressed
+        if (IsTrackpadPressed)
+        {
+            Vector2 rawInput = Vector2.zero; // Pulls current axis reading
+
+            if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxis, out rawInput))
+            {
+                if (rawInput.magnitude < deadzone) // Check if movement goes beyond threshold
+                {
+                    rawInput = Vector2.zero;
+                }
+
+                smoothedInput = Vector2.Lerp(smoothedInput, rawInput, smoothing); // Linear interpolation of the reading for higher smoothing
+                TrackpadInput = smoothedInput;
+            }
+        }
+        else
+        {
+            // Reset when not pressed
+            TrackpadInput = Vector2.zero;
+            smoothedInput = Vector2.zero;
+        }
+    }
+
+    // METHOD: Reads the input of the trigger button
+    private void ReadTriggerInput()
+    {
+        if (!controllerFound || !activeController.isValid)
+        {
+            TriggerPressed = false;
+            return;
+        }
+
+        bool triggerIsPressed;
+        if (activeController.TryGetFeatureValue(CommonUsages.triggerButton, out triggerIsPressed))
+        {
+            // Detect "just pressed" (like Input.GetKeyDown)
+            TriggerPressed = triggerIsPressed && !triggerWasPressed;
+            triggerWasPressed = triggerIsPressed;
+        }
+    }
+
+    // METHOD: Reads the input of the grip button
+    private void ReadGripInput()
+    {
+        if (!controllerFound || !activeController.isValid)
+        {
+            GripPressed = false;
+            return;
+        }
+
+        bool gripIsPressed;
+        if (activeController.TryGetFeatureValue(CommonUsages.gripButton, out gripIsPressed))
+        {
+            // Detect "just pressed" (like Input.GetKeyDown)
+            GripPressed = gripIsPressed && !gripWasPressed;
+            gripWasPressed = gripIsPressed;
+        }
+    }
+
+    // METHOD: Reads the input of the menu button
+    private void ReadMenuInput()
+    {
+        if (!controllerFound || !activeController.isValid)
+        {
+            MenuPressed = false;
+            return;
+        }
+
+        bool menuIsPressed;
+        if (activeController.TryGetFeatureValue(CommonUsages.menuButton, out menuIsPressed))
+        {
+            // Detect "just pressed" (like Input.GetKeyDown)
+            MenuPressed = menuIsPressed && !menuWasPressed;
+            menuWasPressed = menuIsPressed;
+        }
+    }
+
+    // METHOD: Extract movement direction
+    public Vector3 GetMovementDirection(float sensitivity = 1f)
+    {
+        if (!IsTrackpadPressed) // Safety: Returns null if the trackpad is not pressed
+            return Vector3.zero;
+
+        return new Vector3(
+            TrackpadInput.x * sensitivity,
+            TrackpadInput.y * sensitivity,
+            0f
+        );
+    }
+
+    // HELPER METHOD: Assesses availability of controller
+    public bool IsControllerAvailable() 
+    {
+        return controllerFound && activeController.isValid;
+    }
+}

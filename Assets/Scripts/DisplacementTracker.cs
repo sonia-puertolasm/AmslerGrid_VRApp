@@ -1,12 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
+using System.Text;
 
 public class DisplacementTracker : MonoBehaviour
 {
     // Definition of references needed for displacement tracking
     private ProbeDots probeDots;
     private MainGrid mainGrid;
+    private IterationManager iterationManager;
 
     // Definition of empty list for displacement data
     private List<IterationDisplacementData> iterationHistory = new List<IterationDisplacementData>();
@@ -60,7 +63,8 @@ public class DisplacementTracker : MonoBehaviour
     // METHOD: Initialization of relevant functions
     private void Start()
     {
-        mainGrid = FindObjectOfType<MainGrid>(); 
+        mainGrid = FindObjectOfType<MainGrid>();
+        iterationManager = FindObjectOfType<IterationManager>();
 
         if (mainGrid != null) // Safety: Ensures action is only performed when mainGrid exists
         {
@@ -69,6 +73,16 @@ public class DisplacementTracker : MonoBehaviour
         }
 
         StartCoroutine(InitializeTracker());
+    }
+
+    // METHOD: Handle key inputs for export functionality
+    private void Update()
+    {
+        // E KEY: Export ALL probes from ALL iterations (comprehensive export)
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            ExportAllProbesFromAllIterations();
+        }
     }
 
     // METHOD: Live update of displacement tracking every frame
@@ -100,12 +114,26 @@ public class DisplacementTracker : MonoBehaviour
     // METHOD: Coroutine to initialize tracking of displacement until after grid is generated  -> allows method to pause and resume
     private IEnumerator InitializeTracker()
     {
-        yield return new WaitForEndOfFrame(); // Pause until rendering of current frame is finished 
+        yield return new WaitForEndOfFrame(); // Pause until rendering of current frame is finished
 
         // Retrieve only required elements
         probeDots = FindObjectOfType<ProbeDots>();
 
-        if (probeDots == null || probeDots.probes == null || probeDots.probes.Count == 0) // Safety: Avoid action in case probe dots are not existing
+        // Wait for probe dots to be populated (retry up to 5 seconds)
+        float timeout = 5f;
+        float elapsed = 0f;
+        while ((probeDots == null || probeDots.probes == null || probeDots.probes.Count == 0) && elapsed < timeout)
+        {
+            yield return new WaitForSeconds(0.1f); // Wait 100ms between checks
+            elapsed += 0.1f;
+
+            if (probeDots == null)
+            {
+                probeDots = FindObjectOfType<ProbeDots>();
+            }
+        }
+
+        if (probeDots == null || probeDots.probes == null || probeDots.probes.Count == 0) // Safety: Avoid action in case probe dots are not existing after timeout
         {
             yield break; // Stops coroutine immediately
         }
@@ -274,5 +302,205 @@ public class DisplacementTracker : MonoBehaviour
     public void SetLiveUpdateMode(bool enabled)
     {
         liveUpdateEnabled = enabled;
+    }
+
+    // METHOD: Calculate deformation score for a specific iteration
+    // Score = sqrt(sum of (x_final - x_initial)^2 + (y_final - y_initial)^2 + (z_final - z_initial)^2 for all probes)
+    public float CalculateDeformationScore(int iteration)
+    {
+        IterationDisplacementData snapshot = GetIteration(iteration);
+
+        if (snapshot == null) // Safety: Return 0 if iteration doesn't exist
+        {
+            return 0f;
+        }
+
+        float sumOfSquares = 0f;
+
+        foreach (var kvp in snapshot.probeDisplacements)
+        {
+            ProbeDisplacement displacement = kvp.Value;
+
+            // Calculate squared differences for each coordinate
+            Vector3 diff = displacement.currentPosition - displacement.originalPosition;
+            sumOfSquares += diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+        }
+
+        return Mathf.Sqrt(sumOfSquares);
+    }
+
+    // METHOD: Calculate deformation score for the current live state (not saved iteration)
+    public float CalculateLiveDeformationScore()
+    {
+        if (!isInitialized || probeDots == null)
+        {
+            return 0f;
+        }
+
+        float sumOfSquares = 0f;
+
+        for (int i = 0; i < probeDots.probes.Count; i++)
+        {
+            ProbeDisplacement displacement = GetProbeDisplacement(i);
+
+            if (displacement != null)
+            {
+                Vector3 diff = displacement.currentPosition - displacement.originalPosition;
+                sumOfSquares += diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+            }
+        }
+
+        return Mathf.Sqrt(sumOfSquares);
+    }
+
+    // METHOD: Export ALL probe data from ALL iterations (comprehensive export)
+    public void ExportAllProbesFromAllIterations(string fileName = null)
+    {
+        if (!isInitialized || probeDots == null)
+        {
+            return;
+        }
+
+        if (iterationManager == null)
+        {
+            return;
+        }
+
+        // Generate filename if not provided
+        if (string.IsNullOrEmpty(fileName))
+        {
+            fileName = $"DisplacementSummary_{System.DateTime.Now:yyyyMMdd_HHmmss}.txt";
+        }
+
+        // Use persistent data path for cross-platform compatibility
+        string filePath = Path.Combine(Application.persistentDataPath, fileName);
+
+        // Build the text content
+        StringBuilder sb = new StringBuilder();
+
+        // Header
+        sb.AppendLine("========================================");
+        sb.AppendLine("IAG DISPLACEMENT TRACKER - ALL ITERATIONS");
+        sb.AppendLine($"Export Date: {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine("========================================");
+        sb.AppendLine();
+
+        float totalDeformationScore = 0f;
+        int totalProbesAnalyzed = 0;
+
+        // Get iteration data from IterationManager
+        var iterationProbes = iterationManager.GetIterationProbes();
+        var parentToIteration2Probes = iterationManager.GetParentProbeToIteration2Probes();
+        var parentToIteration2Positions = iterationManager.GetParentProbeToIteration2Positions();
+
+        // ITERATION 1 PROBES
+        if (iterationProbes.ContainsKey(1) && iterationProbes[1] != null)
+        {
+            sb.AppendLine("╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗");
+            sb.AppendLine("║                                              ITERATION 1 PROBES                                                        ║");
+            sb.AppendLine("╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
+            sb.AppendLine();
+            sb.AppendLine("Probe Index | Original Position (x, y, z) | Final Position (x, y, z) | Difference (x, y, z) | Magnitude");
+            sb.AppendLine(new string('-', 120));
+
+            float iteration1Score = 0f;
+            List<GameObject> iteration1Probes = iterationProbes[1];
+
+            for (int i = 0; i < iteration1Probes.Count; i++)
+            {
+                GameObject probe = iteration1Probes[i];
+                if (probe == null) continue;
+
+                ProbeDisplacement displacement = GetProbeDisplacement(probe);
+                if (displacement != null)
+                {
+                    Vector3 orig = displacement.originalPosition;
+                    Vector3 curr = displacement.currentPosition;
+                    Vector3 diff = displacement.displacementVector3D;
+
+                    sb.AppendLine($"{i,11} | ({orig.x,8:F4}, {orig.y,8:F4}, {orig.z,8:F4}) | ({curr.x,8:F4}, {curr.y,8:F4}, {curr.z,8:F4}) | ({diff.x,8:F4}, {diff.y,8:F4}, {diff.z,8:F4}) | {displacement.displacementMagnitude,9:F4}");
+
+                    iteration1Score += diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+                    totalProbesAnalyzed++;
+                }
+            }
+
+            iteration1Score = Mathf.Sqrt(iteration1Score);
+            totalDeformationScore += iteration1Score * iteration1Score; // Add squared value to total
+
+            sb.AppendLine();
+            sb.AppendLine($"Iteration 1 Deformation Score: {iteration1Score:F6}");
+            sb.AppendLine();
+        }
+
+        // ITERATION 2 PROBES (organized by parent probe)
+        if (parentToIteration2Probes.Count > 0)
+        {
+            sb.AppendLine("╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗");
+            sb.AppendLine("║                                              ITERATION 2 PROBES                                                        ║");
+            sb.AppendLine("╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
+            sb.AppendLine();
+
+            foreach (var kvp in parentToIteration2Probes)
+            {
+                int parentProbeIndex = kvp.Key;
+                List<GameObject> iteration2Probes = kvp.Value;
+
+                if (iteration2Probes == null || iteration2Probes.Count == 0) continue;
+
+                sb.AppendLine($"--- Parent Probe Index: {parentProbeIndex} ---");
+                sb.AppendLine();
+                sb.AppendLine("Probe ID    | Original Position (x, y, z) | Final Position (x, y, z) | Difference (x, y, z) | Magnitude");
+                sb.AppendLine(new string('-', 120));
+
+                float parentIterationScore = 0f;
+
+                foreach (GameObject probe in iteration2Probes)
+                {
+                    if (probe == null) continue;
+
+                    // Get original position from parentToIteration2Positions
+                    Vector3 originalPos = Vector3.zero;
+                    if (parentToIteration2Positions.ContainsKey(parentProbeIndex) &&
+                        parentToIteration2Positions[parentProbeIndex].ContainsKey(probe))
+                    {
+                        originalPos = parentToIteration2Positions[parentProbeIndex][probe];
+                    }
+
+                    Vector3 currentPos = probe.transform.position;
+                    Vector3 diff = currentPos - originalPos;
+                    float magnitude = diff.magnitude;
+
+                    sb.AppendLine($"{probe.name,11} | ({originalPos.x,8:F4}, {originalPos.y,8:F4}, {originalPos.z,8:F4}) | ({currentPos.x,8:F4}, {currentPos.y,8:F4}, {currentPos.z,8:F4}) | ({diff.x,8:F4}, {diff.y,8:F4}, {diff.z,8:F4}) | {magnitude,9:F4}");
+
+                    parentIterationScore += diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+                    totalProbesAnalyzed++;
+                }
+
+                sb.AppendLine();
+                sb.AppendLine($"Parent Probe {parentProbeIndex} - Deformation Score: {Mathf.Sqrt(parentIterationScore):F6}");
+                sb.AppendLine();
+            }
+        }
+
+        // SECTION 2: Overall Deformation Score
+        sb.AppendLine("╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗");
+        sb.AppendLine("║                                         OVERALL DEFORMATION SCORE                                                      ║");
+        sb.AppendLine("╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
+        sb.AppendLine();
+        sb.AppendLine($"Total Probes Analyzed (All Iterations): {totalProbesAnalyzed}");
+        sb.AppendLine($"Overall Deformation Score: {Mathf.Sqrt(totalDeformationScore):F6}");
+        sb.AppendLine();
+
+        // Write to file
+        try
+        {
+            File.WriteAllText(filePath, sb.ToString());
+            Debug.Log($"Comprehensive data exported successfully to: {filePath}");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Displacement tracker data export failed: {e.Message}");
+        }
     }
 }
