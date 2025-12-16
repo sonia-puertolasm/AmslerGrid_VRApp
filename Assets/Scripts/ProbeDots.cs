@@ -10,6 +10,12 @@ public enum ProbeInputMethod
     ViveTrackpad
 }
 
+public enum ProbeGenerationMode
+{
+    Standard,
+    Inverse
+}
+
 // Manages probe dots within the application
 public class ProbeDots : MonoBehaviour
 {
@@ -24,6 +30,12 @@ public class ProbeDots : MonoBehaviour
     internal float probeDotSize = 0.2f; // Size of each probe dot
     internal float moveSpeed = 2f; // Speed of probe movement
     internal float probeSpacing = 0f; // Spacing between probes
+
+    // Probe dot generation settings
+    [SerializeField] private ProbeGenerationMode generationMode = ProbeGenerationMode.Standard;
+    private int probeSpacingCells = 2;
+
+    // private bool excludeEdgeProbes = false; - To incorporate with inverse mechanism implementation
 
     internal List<GameObject> probes = new List<GameObject>(); // List of probe GameObjects
     internal Dictionary<GameObject, Vector3> probeInitialPositions = new Dictionary<GameObject, Vector3>(); // Initial positions of probes
@@ -131,27 +143,31 @@ public class ProbeDots : MonoBehaviour
         }
 
         int gridSize = mainGrid.GridSize; // Re-definition of the size of the grid
-        int spacing = gridSize / 3; // For 8x8 grid: spacing = 2 (grid divisions at indices 2, 4, 6)
         float cellSize = mainGrid.CellSize; // Size of each cell in the grid
-        probeSpacing = spacing * cellSize; // Actual spacing in world units
+        probeSpacing = probeSpacingCells * cellSize; // Actual spacing in world units
 
-        // Define the 8 probe positions (corners and edges, excluding center)
-        List<Vector2Int> probeGridPositions = new List<Vector2Int> // Grid indices for probe placement
+        // Define the 8 probe positions
+        List<Vector2Int> probeGridPositions = new List<Vector2Int>(); // Grid indices for probe placement
+        
+        if (generationMode == ProbeGenerationMode.Standard)
         {
-            new Vector2Int(spacing, spacing),           // Bottom-left
-            new Vector2Int(spacing * 2, spacing),       // Bottom-center
-            new Vector2Int(spacing * 3, spacing),       // Bottom-right
-            new Vector2Int(spacing, spacing * 2),       // Middle-left
-            new Vector2Int(spacing * 3, spacing * 2),   // Middle-right
-            new Vector2Int(spacing, spacing * 3),       // Top-left
-            new Vector2Int(spacing * 2, spacing * 3),   // Top-center
-            new Vector2Int(spacing * 3, spacing * 3)    // Top-right
-        };
+            probeGridPositions = GenerateStandardProbePositions(gridSize);
+        }
+
+        else if (generationMode == ProbeGenerationMode.Inverse)
+        {
+            return; // - To incorporate with inverse mechanism implementation
+        }
 
         foreach (var pos in probeGridPositions) // Loop through each defined probe position
         {
             int row = pos.y; // Y corresponds to the row index
             int col = pos.x; // X corresponds to the column index
+
+            if (row < 0 || row >= gridPoints.GetLength(0) || col < 0 || col >= gridPoints.GetLength(1))
+            {
+                continue;
+            }
 
             GameObject gridPoint = gridPoints[row, col]; // Get the corresponding grid point
 
@@ -192,6 +208,110 @@ public class ProbeDots : MonoBehaviour
             probes.Add(gridPoint);    
         }
     }
+
+    // METHOD: Generate probe positions for standard mode (from center, spacing of 2)
+
+    private List<Vector2Int> GenerateStandardProbePositions(int gridSize)
+    {
+        List<Vector2Int> positions = new List<Vector2Int>();
+
+        int centerIndex = gridSize / 2;
+
+        for (int rowOffset = -1; rowOffset <= 1; rowOffset++)
+        {
+            for (int colOffset = -1; colOffset <= 1; colOffset++)
+            {
+                // Skip the center position
+                if (rowOffset == 0 && colOffset == 0)
+                    continue;
+                
+                int row = centerIndex + (rowOffset * probeSpacingCells);
+                int col = centerIndex + (colOffset * probeSpacingCells);
+                
+                // Ensure positions are within valid grid bounds
+                if (row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
+                {
+                    positions.Add(new Vector2Int(col, row));
+                }
+            }
+        }
+
+        return positions;
+    }
+
+    // *FUTURE* METHOD: Generate probe positions for inverse mode - To incorporate with inverse mechanism implementation
+
+    /*
+    private List<Vector2Int> GenerateInverseProbePositions(int gridSize)
+    {
+        List<Vector2Int> positions = new List<Vector2Int>();
+        
+        // STEP 1: Detect deformation intersections
+        // Find the intersection point(s) between horizontal and vertical deformations
+        // This requires access to the GridRebuildManager's deformation data
+        
+        Vector2Int deformationOrigin = DetectDeformationIntersection();
+        
+        // STEP 2: Generate probes around the deformation origin
+        // Use spacing of 2 cells in all directions
+        for (int rowOffset = -1; rowOffset <= 1; rowOffset++)
+        {
+            for (int colOffset = -1; colOffset <= 1; colOffset++)
+            {
+                // Skip the origin (intersection point)
+                if (rowOffset == 0 && colOffset == 0)
+                    continue;
+                
+                int row = deformationOrigin.y + (rowOffset * probeSpacingCells);
+                int col = deformationOrigin.x + (colOffset * probeSpacingCells);
+                
+                // STEP 3: Apply edge exclusion if enabled
+                if (excludeEdgeProbes)
+                {
+                    // Skip probes that are too close to grid edges
+                    int edgeBuffer = 1; // Minimum distance from edge
+                    if (row < edgeBuffer || row > gridSize - edgeBuffer ||
+                        col < edgeBuffer || col > gridSize - edgeBuffer)
+                    {
+                        continue;
+                    }
+                }
+                
+                // Ensure positions are within valid grid bounds
+                if (row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
+                {
+                    positions.Add(new Vector2Int(col, row));
+                }
+            }
+        }
+        
+        return positions;
+    }
+
+    // FUTURE HELPER: Detect the intersection of deformations
+    private Vector2Int DetectDeformationIntersection()
+    {
+        // This method will analyze the grid deformation data to find where
+        // horizontal and vertical deformations intersect
+        
+        // Placeholder: Return grid center for now
+        int centerIndex = mainGrid.GridSize / 2;
+        return new Vector2Int(centerIndex, centerIndex);
+        
+        // FUTURE IMPLEMENTATION:
+        // 1. Access GridRebuildManager's accumulatedDisplacement data
+        // 2. Analyze displacement vectors to identify primary deformation axes
+        // 3. Find the grid cell where both horizontal and vertical deformations are strongest
+        // 4. Return that cell as the origin for probe generation
+        //
+        // Example logic:
+        // - Iterate through all grid cells
+        // - Calculate horizontal displacement magnitude (x-component)
+        // - Calculate vertical displacement magnitude (y-component)
+        // - Find cell with maximum combined displacement or specific intersection criteria
+        // - Return that cell's coordinates
+    }
+    */
 
     // METHOD: Handle probe selection via numerical pad keyboard (1-9)
     private void HandleKeyboardProbeSelection()
