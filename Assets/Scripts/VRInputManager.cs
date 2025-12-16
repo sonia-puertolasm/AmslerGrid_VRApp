@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.XR;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 public class VRInputHandler : MonoBehaviour
 {
@@ -14,13 +13,11 @@ public class VRInputHandler : MonoBehaviour
     public Vector2 TrackpadInput { get; private set; }
     public bool IsTrackpadPressed { get; private set; }
     public bool IsTrackpadCenterPressed { get; private set; }
-    [SerializedField] private float centerClickRadius = 0.3f; // How close to the center counts as center
+    float centerClickRadius = 0.3f; // How close to the center counts as center
 
     // Button state properties
     public bool TriggerPressed { get; private set; }
-    public bool GripPressed { get; private set; }
-    public bool MenuPressed { get; private set; }
-    
+
     // Fine-tuning specific properties for controller use
     private float deadzone = 0.15f; // Threshold to ignore tiny axis movements possible from the trackpad
     private float smoothing = 0.7f; // Dampening factor for steadier motion
@@ -28,8 +25,6 @@ public class VRInputHandler : MonoBehaviour
 
     // State tracking for button detection
     private bool triggerWasPressed = false;
-    private bool gripWasPressed = false;
-    private bool menuWasPressed = false;
 
     // Initialization of all methods
     void Start()
@@ -52,7 +47,6 @@ public class VRInputHandler : MonoBehaviour
         }
         ReadTrackpadInput();
         ReadTriggerInput();
-        ReadGripInput();
     }
 
     // METHOD: Identifies a usable XR controller each frame
@@ -89,51 +83,67 @@ public class VRInputHandler : MonoBehaviour
         controllerFound = false;
     }
 
-    // METHOD: Reads input of the trackpad (PRESS, not touch)
+    // METHOD: Reads input of the trackpad (PRESS and center detection)
     private void ReadTrackpadInput()
     {
-        if (!controllerFound || !activeController.isValid) // Safety: Returns early if no controller 
+        if (!controllerFound || !activeController.isValid)
+        {
+            IsTrackpadPressed = false;
+            IsTrackpadCenterPressed = false;
+            TrackpadInput = Vector2.zero;
+            smoothedInput = Vector2.zero;
             return;
+        }
 
-        // Check if trackpad is pressed (clicked)
+        bool wasPressed = IsTrackpadPressed; // Store previous state
+
+        // Check if trackpad is pressed
         bool pressed;
         if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out pressed))
         {
             IsTrackpadPressed = pressed;
         }
 
-        // Detect center click
-        if (IsTrackpadPressed && !wasPressed)
+        // Detect center click: pressed while position is near center
+        if (IsTrackpadPressed && !wasPressed) // Just pressed this frame
         {
-            if (rawInput.magnitude < centerClickRadius)
+            Vector2 clickPosition = Vector2.zero;
+            if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxis, out clickPosition))
             {
-                IsTrackpadCenterPressed = true;
-            }
-            else
-            {
-                IsTrackpadCenterPressed = false;
+                // Check if click position is near center
+                if (clickPosition.magnitude < centerClickRadius)
+                {
+                    IsTrackpadCenterPressed = true;
+                }
+                else
+                {
+                    IsTrackpadCenterPressed = false;
+                }
             }
         }
+        else
+        {
+            IsTrackpadCenterPressed = false;
+        }
 
-        // Only read trackpad position if it's pressed
+        // Only read trackpad position for movement if it's pressed
         if (IsTrackpadPressed)
         {
-            Vector2 rawInput = Vector2.zero; // Pulls current axis reading
+            Vector2 rawInput = Vector2.zero;
 
             if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxis, out rawInput))
             {
-                if (rawInput.magnitude < deadzone) // Check if movement goes beyond threshold
+                if (rawInput.magnitude < deadzone)
                 {
                     rawInput = Vector2.zero;
                 }
 
-                smoothedInput = Vector2.Lerp(smoothedInput, rawInput, smoothing); // Linear interpolation of the reading for higher smoothing
+                smoothedInput = Vector2.Lerp(smoothedInput, rawInput, smoothing);
                 TrackpadInput = smoothedInput;
             }
         }
         else
         {
-            // Reset when not pressed
             TrackpadInput = Vector2.zero;
             smoothedInput = Vector2.zero;
         }
@@ -154,24 +164,6 @@ public class VRInputHandler : MonoBehaviour
             // Detect "just pressed" (like Input.GetKeyDown)
             TriggerPressed = triggerIsPressed && !triggerWasPressed;
             triggerWasPressed = triggerIsPressed;
-        }
-    }
-
-    // METHOD: Reads the input of the grip button
-    private void ReadGripInput()
-    {
-        if (!controllerFound || !activeController.isValid)
-        {
-            GripPressed = false;
-            return;
-        }
-
-        bool gripIsPressed;
-        if (activeController.TryGetFeatureValue(CommonUsages.gripButton, out gripIsPressed))
-        {
-            // Detect "just pressed" (like Input.GetKeyDown)
-            GripPressed = gripIsPressed && !gripWasPressed;
-            gripWasPressed = gripIsPressed;
         }
     }
 

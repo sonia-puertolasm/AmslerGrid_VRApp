@@ -136,7 +136,7 @@ public class IterationManager : MonoBehaviour
             }
         }
 
-        if (vrInputHandler.TrackpadCenterClicked)
+        if (vrInputHandler.IsTrackpadCenterPressed)
         {
             HandleBackspaceKey();
         }
