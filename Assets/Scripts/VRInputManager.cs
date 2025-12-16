@@ -57,11 +57,11 @@ public class VRInputHandler : MonoBehaviour
     // METHOD: Identifies a usable XR controller each frame
     private void InitializeController()
     {
-        Debug.Log("VRInputHandler: Looking for controllers...");
+        UnityEngine.Debug.Log("VRInputHandler: Looking for controllers...");
 
         var devices = new List<InputDevice>();
         InputDevices.GetDevices(devices);
-        Debug.Log($"VRInputHandler: Total devices found: {devices.Count}");
+        UnityEngine.Debug.Log($"VRInputHandler: Total devices found: {devices.Count}");
 
         // Right controller
         InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
@@ -70,7 +70,7 @@ public class VRInputHandler : MonoBehaviour
         {
             activeController = rightController;
             controllerFound = true;
-            Debug.Log("VR Input: Controller detected (RIGHT)");
+            UnityEngine.Debug.Log("VR Input: Controller detected (RIGHT)");
             return;
         }
 
@@ -81,7 +81,7 @@ public class VRInputHandler : MonoBehaviour
         {
             activeController = leftController;
             controllerFound = true;
-            Debug.Log("VR Input: Controller detected (LEFT)");
+            UnityEngine.Debug.Log("VR Input: Controller detected (LEFT)");
             return;
         }
 
