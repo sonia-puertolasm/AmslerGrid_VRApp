@@ -7,7 +7,8 @@ using UnityEngine;
 public enum ProbeInputMethod
 {
     Keyboard,
-    ViveTrackpad
+    ViveTrackpad,
+    ViveMotion
 }
 
 public enum ProbeGenerationMode
@@ -73,7 +74,7 @@ public class ProbeDots : MonoBehaviour
             constraints = gameObject.AddComponent<ProbeDotConstraints>();
         }
 
-        // Initialize focus system reference
+        // Initialize system reference
         focusSystem = FindObjectOfType<FocusSystem>();
 
         // Initialize iteration manager reference
