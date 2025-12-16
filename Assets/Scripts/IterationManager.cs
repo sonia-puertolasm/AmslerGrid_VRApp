@@ -124,12 +124,19 @@ public class IterationManager : MonoBehaviour
         if (vrInputHandler == null || !vrInputHandler.IsControllerAvailable())
             return;
 
-        if (vrInputHandler.GripPressed)
+        if (vrInputHandler.TriggerPressed)
         {
-            HandleEnterKey();
+            if (currentIteration == 1)
+            {
+                HandleEnterKey();
+            }
+            else if (currentIteration == 2)
+            {
+                HandleBackspaceKey();
+            }
         }
 
-        if (vrInputHandler.MenuPressed)
+        if (vrInputHandler.TrackpadCenterClicked)
         {
             HandleBackspaceKey();
         }

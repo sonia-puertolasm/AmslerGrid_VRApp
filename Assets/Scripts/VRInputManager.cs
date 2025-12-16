@@ -12,8 +12,10 @@ public class VRInputHandler : MonoBehaviour
 
     // Trackpad state specific properties
     public Vector2 TrackpadInput { get; private set; }
-    public bool IsTrackpadPressed { get; private set; } // CHANGED: From IsTrackpadTouched to IsTrackpadPressed
-    
+    public bool IsTrackpadPressed { get; private set; }
+    public bool IsTrackpadCenterPressed { get; private set; }
+    [SerializedField] private float centerClickRadius = 0.3f; // How close to the center counts as center
+
     // Button state properties
     public bool TriggerPressed { get; private set; }
     public bool GripPressed { get; private set; }
@@ -51,7 +53,6 @@ public class VRInputHandler : MonoBehaviour
         ReadTrackpadInput();
         ReadTriggerInput();
         ReadGripInput();
-        ReadMenuInput();
     }
 
     // METHOD: Identifies a usable XR controller each frame
@@ -94,11 +95,24 @@ public class VRInputHandler : MonoBehaviour
         if (!controllerFound || !activeController.isValid) // Safety: Returns early if no controller 
             return;
 
-        // Check if trackpad is PRESSED (clicked)
+        // Check if trackpad is pressed (clicked)
         bool pressed;
         if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out pressed))
         {
             IsTrackpadPressed = pressed;
+        }
+
+        // Detect center click
+        if (IsTrackpadPressed && !wasPressed)
+        {
+            if (rawInput.magnitude < centerClickRadius)
+            {
+                IsTrackpadCenterPressed = true;
+            }
+            else
+            {
+                IsTrackpadCenterPressed = false;
+            }
         }
 
         // Only read trackpad position if it's pressed
@@ -158,24 +172,6 @@ public class VRInputHandler : MonoBehaviour
             // Detect "just pressed" (like Input.GetKeyDown)
             GripPressed = gripIsPressed && !gripWasPressed;
             gripWasPressed = gripIsPressed;
-        }
-    }
-
-    // METHOD: Reads the input of the menu button
-    private void ReadMenuInput()
-    {
-        if (!controllerFound || !activeController.isValid)
-        {
-            MenuPressed = false;
-            return;
-        }
-
-        bool menuIsPressed;
-        if (activeController.TryGetFeatureValue(CommonUsages.menuButton, out menuIsPressed))
-        {
-            // Detect "just pressed" (like Input.GetKeyDown)
-            MenuPressed = menuIsPressed && !menuWasPressed;
-            menuWasPressed = menuIsPressed;
         }
     }
 
