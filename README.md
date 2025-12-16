@@ -65,9 +65,8 @@ This project implements a VR–based prototype of the IAG approach for the asses
 | Numpad 1–9 (except 5)      | First-iteration probe dot selection      |
 | Numpad 1–9                 | Higher-iteration probe dot selection     |
 | Pressed trackpad           | Selected probe dot displacement          |
-| Controller trigger button  | Probe dot displacement confirmation      |
-| Controller grip button     | Navigate to higher iteration (if IT = 1) |
-| Controller menu button     | Navigate to lower iteration (if IT = 2)  |
+| Central trackpad pressing  | Probe dot displacement confirmation      |
+| Controller trigger button  | Navigate to higher/lower iteration       |
 
 *For controller-based mode using motion detection*
 
