@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.XR;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 public class VRInputHandler : MonoBehaviour
 {
@@ -29,6 +32,12 @@ public class VRInputHandler : MonoBehaviour
     // Initialization of all methods
     void Start()
     {
+        StartCoroutine(DelayedInitialize());
+    }
+
+    private IEnumerator DelayedInitialize()
+    {
+        yield return new WaitForSeconds(1f);
         InitializeController();
     }
 
@@ -48,6 +57,12 @@ public class VRInputHandler : MonoBehaviour
     // METHOD: Identifies a usable XR controller each frame
     private void InitializeController()
     {
+        Debug.Log("VRInputHandler: Looking for controllers...");
+
+        var devices = new List<InputDevice>();
+        InputDevices.GetDevices(devices);
+        Debug.Log($"VRInputHandler: Total devices found: {devices.Count}");
+
         // Right controller
         InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
         
