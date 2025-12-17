@@ -49,23 +49,24 @@ This project implements a VR–based prototype of the IAG approach for the asses
 
 *For keyboard mode*
 
-|      Interaction       | Action|
-| Numpad 1-9 (exc. 5)    | 1st iteration probe dot selection      | 
-| Numpad 1-9             | Higher iteration probe dot selection   |
-| Arrow keys             | Selected probe dot displacement        |
-| Spacebar               | Probe dot displacement confirmation    |
-| Enter (also in Numpad) | Higher iteration travelling (if IT = 1)|
-| Backspace              | Lower iteration travelling (if IT = 2) |
+| Interaction                  | Action                                   |
+|------------------------------|------------------------------------------|
+| Numpad 1–9 (except 5)        | First-iteration probe dot selection      |
+| Numpad 1–9                   | Higher-iteration probe dot selection     |
+| Arrow keys                   | Selected probe dot displacement          |
+| Spacebar                     | Probe dot displacement confirmation      |
+| Enter (incl. Numpad Enter)   | Navigate to higher iteration (if IT = 1) |
+| Backspace                    | Navigate to lower iteration (if IT = 2)  |
 
 *For controller-based mode using trackpad*
 
-|      Interaction          | Action|
-| Numpad 1-9 (exc. 5)       | 1st iteration probe dot selection      | 
-| Numpad 1-9                | Higher iteration probe dot selection   |
-| Pressed trackpad          | Selected probe dot displacement        |
-| Controller trigger button | Probe dot displacement confirmation    |
-| Controller grip button    | Higher iteration travelling (if IT = 1)|
-| Controller menu button    | Lower iteration travelling (if IT = 2) |
+| Interaction                | Action                                   |
+|----------------------------|------------------------------------------|
+| Numpad 1–9 (except 5)      | First-iteration probe dot selection      |
+| Numpad 1–9                 | Higher-iteration probe dot selection     |
+| Pressed trackpad           | Selected probe dot displacement          |
+| Central trackpad pressing  | Probe dot displacement confirmation      |
+| Controller trigger button  | Navigate to higher/lower iteration       |
 
 *For controller-based mode using motion detection*
 
