@@ -124,21 +124,23 @@ public class IterationManager : MonoBehaviour
         if (vrInputHandler == null || !vrInputHandler.IsControllerAvailable())
             return;
 
+        // Trigger: Navigate iterations (advance when iteration=1, return when iteration=2)
         if (vrInputHandler.TriggerPressed)
         {
             if (currentIteration == 1)
             {
-                HandleEnterKey();
+                HandleEnterKey(); // Advance to iteration 2
             }
             else if (currentIteration == 2)
             {
-                HandleBackspaceKey();
+                HandleBackspaceKey(); // Return to iteration 1
             }
         }
 
+        // Center trackpad click: Confirm probe displacement (same as Space bar)
         if (vrInputHandler.IsTrackpadCenterPressed)
         {
-            HandleBackspaceKey();
+            HandleSpaceBar(); // Mark probe as completed
         }
     }
     // HELPER METHOD: Manages the interaction given enter key engagement
