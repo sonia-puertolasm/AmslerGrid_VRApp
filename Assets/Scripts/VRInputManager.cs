@@ -29,6 +29,8 @@ public class VRInputHandler : MonoBehaviour
     // Double-click detection
     private float lastClickTime = 0f;
     private float doubleClickThreshold = 0.3f; // Maximum time between clicks (in seconds)
+    private float trackpadPressTime = 0f; // When trackpad was pressed
+    private float quickClickThreshold = 0.2f; // Maximum hold time to count as a "click" (not movement)
 
     // Initialization of all methods
     void Start()
@@ -103,29 +105,44 @@ public class VRInputHandler : MonoBehaviour
         bool pressed;
         if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out pressed))
         {
-            IsTrackpadPressed = pressed;
-            
-            // Detect click (just pressed this frame)
-            bool clickedThisFrame = pressed && !trackpadWasPressed;
-            
-            if (clickedThisFrame)
+            // Track when trackpad is first pressed
+            if (pressed && !trackpadWasPressed)
             {
-                float currentTime = Time.time;
-                float timeSinceLastClick = currentTime - lastClickTime;
+                trackpadPressTime = Time.time;
+            }
+            
+            // Track when trackpad is released
+            if (!pressed && trackpadWasPressed)
+            {
+                float holdDuration = Time.time - trackpadPressTime;
                 
-                // Check if this is a double-click
-                if (timeSinceLastClick <= doubleClickThreshold)
+                // Only count as a "click" if it was a quick press-and-release
+                if (holdDuration < quickClickThreshold)
                 {
-                    TrackpadDoubleClicked = true;
-                    lastClickTime = 0f; // Reset to prevent triple-click detection
+                    float timeSinceLastClick = Time.time - lastClickTime;
+                    
+                    // Check if this is a double-click
+                    if (timeSinceLastClick <= doubleClickThreshold)
+                    {
+                        TrackpadDoubleClicked = true;
+                        lastClickTime = 0f; // Reset to prevent triple-click detection
+                        UnityEngine.Debug.Log("VR Input: DOUBLE-CLICK DETECTED!");
+                    }
+                    else
+                    {
+                        // This is the first click, record the time
+                        lastClickTime = Time.time;
+                        UnityEngine.Debug.Log("VR Input: First click detected");
+                    }
                 }
                 else
                 {
-                    // This is the first click, record the time
-                    lastClickTime = currentTime;
+                    // This was a hold for movement, not a click - reset double-click detection
+                    lastClickTime = 0f;
                 }
             }
             
+            IsTrackpadPressed = pressed;
             trackpadWasPressed = pressed;
         }
 
