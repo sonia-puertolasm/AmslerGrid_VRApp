@@ -92,57 +92,45 @@ public class IterationManager : MonoBehaviour
 
     void Update() // Update is called once per frame
     {
-        bool isVRMode = (probeDots != null && probeDots.GetInputMethod() == ProbeInputMethod.ViveTrackpad); // Verifies in which mode are we (VR Controller or Keyboard)
+        bool isVRMode = (probeDots != null && probeDots.GetInputMethod() == ProbeInputMethod.ViveTrackpad);
+
+        // Keyboard controls work in BOTH modes
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            HandleEnterKey();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Backspace))
+        {
+            HandleBackspaceKey();
+        }
 
         if (isVRMode)
         {
+            // In VR mode: trigger confirms probe, keyboard navigates iterations
             HandleVRControllerInput();
         }
         else
         {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                HandleEnterKey();
-            }
-
+            // In keyboard mode: space bar confirms probe
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 HandleSpaceBar();
-            }
-
-            if (Input.GetKeyDown(KeyCode.Backspace))
-            {
-                HandleBackspaceKey();
             }
         }
     }
 
 
-    // METHOD: Handle VR controller input for confirmation and iteration navigation
+    // METHOD: Handle VR controller input (trigger confirms probe)
     private void HandleVRControllerInput()
     {
         if (vrInputHandler == null || !vrInputHandler.IsControllerAvailable())
             return;
 
-        // Single trigger press: Confirm probe displacement (Space bar)
+        // Trigger press: Confirm probe displacement (same as Space bar)
         if (vrInputHandler.TriggerPressed)
         {
-            HandleSpaceBar(); // Mark probe as completed
-        }
-
-        // Double trigger press: Confirm + navigate iterations
-        if (vrInputHandler.TriggerDoublePressed)
-        {
-            HandleSpaceBar(); // First, mark probe as completed
-            
-            if (currentIteration == 1)
-            {
-                HandleEnterKey(); // Then advance to iteration 2
-            }
-            else if (currentIteration == 2)
-            {
-                HandleBackspaceKey(); // Then return to iteration 1
-            }
+            HandleSpaceBar();
         }
     }
 

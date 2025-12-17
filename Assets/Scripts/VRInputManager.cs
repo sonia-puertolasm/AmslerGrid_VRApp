@@ -14,8 +14,7 @@ public class VRInputHandler : MonoBehaviour
     public bool IsTrackpadPressed { get; private set; }
 
     // Button state properties
-    public bool TriggerPressed { get; private set; }        // Single trigger press
-    public bool TriggerDoublePressed { get; private set; }  // Double trigger press
+    public bool TriggerPressed { get; private set; }
 
     // Fine-tuning specific properties for controller use
     private float deadzone = 0.15f;
@@ -24,12 +23,6 @@ public class VRInputHandler : MonoBehaviour
 
     // State tracking for trigger detection
     private bool triggerWasPressed = false;
-    private float triggerPressStartTime = 0f;
-    private float lastTriggerReleaseTime = 0f;
-    
-    // Double-press thresholds
-    private float quickPressThreshold = 0.2f;      // Max hold time to count as a "press"
-    private float doublePressWindow = 0.3f;        // Max time between presses for double-press
 
     // Initialization
     void Start()
@@ -124,59 +117,20 @@ public class VRInputHandler : MonoBehaviour
         }
     }
 
-    // METHOD: Reads trigger input (single and double press detection)
+    // METHOD: Reads trigger input (simple press detection)
     private void ReadTriggerInput()
     {
         if (!controllerFound || !activeController.isValid)
         {
             TriggerPressed = false;
-            TriggerDoublePressed = false;
             return;
         }
-
-        // Reset flags each frame
-        TriggerPressed = false;
-        TriggerDoublePressed = false;
 
         bool triggerIsPressed;
         if (activeController.TryGetFeatureValue(CommonUsages.triggerButton, out triggerIsPressed))
         {
-            // Detect press start
-            if (triggerIsPressed && !triggerWasPressed)
-            {
-                triggerPressStartTime = Time.time;
-            }
-            
-            // Detect release
-            if (!triggerIsPressed && triggerWasPressed)
-            {
-                float holdDuration = Time.time - triggerPressStartTime;
-                
-                // Only count as a "press" if it was quick (not a long hold)
-                if (holdDuration < quickPressThreshold)
-                {
-                    float timeSinceLastRelease = Time.time - lastTriggerReleaseTime;
-                    
-                    // Check if this is a double-press
-                    if (timeSinceLastRelease <= doublePressWindow && lastTriggerReleaseTime > 0f)
-                    {
-                        TriggerDoublePressed = true;
-                        lastTriggerReleaseTime = 0f; // Reset to prevent triple-press
-                    }
-                    else
-                    {
-                        // Single press detected
-                        TriggerPressed = true;
-                        lastTriggerReleaseTime = Time.time;
-                    }
-                }
-                else
-                {
-                    // Long hold - reset double-press detection
-                    lastTriggerReleaseTime = 0f;
-                }
-            }
-            
+            // Detect "just pressed" (like Input.GetKeyDown)
+            TriggerPressed = triggerIsPressed && !triggerWasPressed;
             triggerWasPressed = triggerIsPressed;
         }
     }
