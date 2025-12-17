@@ -118,29 +118,31 @@ public class IterationManager : MonoBehaviour
     }
 
 
-    // METHOD: Handle VR controller input for iteration navigation
+    // METHOD: Handle VR controller input for confirmation and iteration navigation
     private void HandleVRControllerInput()
     {
         if (vrInputHandler == null || !vrInputHandler.IsControllerAvailable())
             return;
 
-        // Trigger: Navigate iterations (advance when iteration=1, return when iteration=2)
+        // Single trigger press: Confirm probe displacement (Space bar)
         if (vrInputHandler.TriggerPressed)
         {
+            HandleSpaceBar(); // Mark probe as completed
+        }
+
+        // Double trigger press: Confirm + navigate iterations
+        if (vrInputHandler.TriggerDoubleClicked)
+        {
+            HandleSpaceBar(); // First, mark probe as completed
+            
             if (currentIteration == 1)
             {
-                HandleEnterKey(); // Advance to iteration 2
+                HandleEnterKey(); // Then advance to iteration 2
             }
             else if (currentIteration == 2)
             {
-                HandleBackspaceKey(); // Return to iteration 1
+                HandleBackspaceKey(); // Then return to iteration 1
             }
-        }
-
-        // Trackpad double-click: Confirm probe displacement (same as Space bar)
-        if (vrInputHandler.TrackpadDoubleClicked)
-        {
-            HandleSpaceBar(); // Mark probe as completed
         }
     }
     // HELPER METHOD: Manages the interaction given enter key engagement
