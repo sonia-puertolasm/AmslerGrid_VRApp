@@ -121,11 +121,8 @@ public class ProbeDots : MonoBehaviour
 
         if (inputMethod == ProbeInputMethod.ViveTrackpad)
         {
-            // VR MODE: Trackpad for movement, trigger for confirmation
-            // Trackpad press + move: Probe displacement
-            // Trigger: Confirm probe (handled by IterationManager)
-            // Enter/Backspace keys: Navigate iterations (same as keyboard)
             HandleProbeMovement();
+            HandleVRTriggerComplete();
         }
         else
         {
@@ -291,7 +288,7 @@ public class ProbeDots : MonoBehaviour
         return positions;
     }
 
-    // FUTURE HELPER: Detect the intersection of deformations
+    // FUTURE *HELPER METHOD*: Detect the intersection of deformations
     private Vector2Int DetectDeformationIntersection()
     {
         // This method will analyze the grid deformation data to find where
