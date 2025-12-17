@@ -92,7 +92,10 @@ public class IterationManager : MonoBehaviour
 
     void Update() // Update is called once per frame
     {
-        bool isVRMode = (probeDots != null && probeDots.GetInputMethod() == ProbeInputMethod.ViveTrackpad);
+        // Check if we're in VR mode (either trackpad or motion)
+        bool isVRMode = (probeDots != null && 
+                        (probeDots.GetInputMethod() == ProbeInputMethod.ViveTrackpad || 
+                         probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion));
 
         // Keyboard controls work in BOTH modes
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
@@ -180,6 +183,12 @@ public class IterationManager : MonoBehaviour
                 {
                     focusSystem.ExitFocusMode();
                 }
+
+                // Reset motion tracking when probe is completed (if in ViveMotion mode)
+                if (probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+                {
+                    vrInputHandler.ResetMotionTracking();
+                }
             }
         }
         else if (currentIteration == 2)
@@ -200,6 +209,12 @@ public class IterationManager : MonoBehaviour
                 {
                     focusSystem.ExitFocusMode();
                 }
+
+                // Reset motion tracking when probe is completed (if in ViveMotion mode)
+                if (probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+                {
+                    vrInputHandler.ResetMotionTracking();
+                }
             }
         }
     }
@@ -207,80 +222,54 @@ public class IterationManager : MonoBehaviour
     // HELPER METHOD: Manages the interaction with the backspace key
     private void HandleBackspaceKey()
     {
-        if (currentIteration > 1 && probeDots != null && probeDots.selectedProbeIndex == -1) // Safety: Ensures the travelling to a previous iteration is possible and the existance of probe dots
+        if (currentIteration == 2)
         {
-            if (currentIteration == 2) // Travelling back to iteration 1 after pressing backspace in iteration 2 ONLY
-            {
-                ReturnToIteration1();
-            }
+            ReturnToIteration1();
         }
     }
 
-    // METHOD: Retrieves higher-iteration setup for already existing IT2 probe dots
+    // METHOD: Returns to iteration 2 from 1 with updated state on probe
     private void ReturnToIteration2(int parentProbeIndex)
     {
-        GameObject parentProbe = iterationProbes[1][parentProbeIndex];
-        if (parentProbe == null || gridRebuildManager == null) // Safety: Checks if the references exist before proceeding
-        {
-            return;
-        }
+        currentIteration = 2;
+        currentParentProbeIndex = parentProbeIndex;
 
-        if (!gridRebuildManager.probeGridIndices.ContainsKey(parentProbe)) // Safety: Checks if the parent probe exists
-        {
-            return;
-        }
-
-        Vector2Int parentGridIndex = gridRebuildManager.probeGridIndices[parentProbe]; // Indexing of the parent probe in rows (x) and columns (y)
-        int parentRow = parentGridIndex.y;
-        int parentCol = parentGridIndex.x;
+        GameObject parentProbe = probeDots.probes[parentProbeIndex];
 
         HideIteration1ProbesExcept(parentProbe);
 
-        UpdateProbeInfluenceRadius(parentProbe, 1);
-
-        List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex]; // Defines a list for the probe dots for IT2 given the parent probe dot
-        Dictionary<GameObject, Vector3> iteration2Positions = parentProbeToIteration2Positions[parentProbeIndex]; // Defines a dictionary for the positions for IT2 given the parent probe dot
-
-        Vector3 parentDeformedPosition = gridRebuildManager.GetDeformedGridPoint(parentRow, parentCol); // Extraction of deformed position of parent probe dot
-        parentDeformedPosition.z = gridCenter.z; // Define z-coordinate as center of the grid
-        parentProbe.transform.position = parentDeformedPosition;
-
-        parentProbe.SetActive(true); 
-        Renderer parentRenderer = parentProbe.GetComponent<Renderer>();
-        if (parentRenderer != null) // Safety: Ensures performance only if the parent renderer exists
+        if (iterationFixationPoints.ContainsKey(1))
         {
-            parentRenderer.enabled = true;
+            GameObject fixation = iterationFixationPoints[1];
+            if (fixation != null)
+            {
+                fixation.SetActive(false);
+                Renderer renderer = fixation.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = false;
+                }
+            }
         }
 
-        foreach (GameObject probe in iteration2Probes) // Iteration over probe dots for IT2
+        List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex];
+        foreach (GameObject probe in iteration2Probes)
         {
-            if (probe != null) // Safety: Proceeds as long as the probe dots exist
+            if (probe != null)
             {
-                if (gridRebuildManager.probeGridIndices.ContainsKey(probe))
-                {
-                    Vector2Int probeGridIndex = gridRebuildManager.probeGridIndices[probe];
-                    int probeRow = probeGridIndex.y;
-                    int probeCol = probeGridIndex.x;
-
-                    Vector3 deformedPosition = gridRebuildManager.GetDeformedGridPoint(probeRow, probeCol);
-                    deformedPosition.z = gridCenter.z;
-
-                    probe.transform.position = deformedPosition;
-                }
-
                 probe.SetActive(true);
                 Renderer renderer = probe.GetComponent<Renderer>();
-                if (renderer != null) // Safety: Ensures performance only if the parent renderer exists
+                if (renderer != null)
                 {
                     renderer.enabled = true;
                 }
             }
         }
 
-        List<GameObject> allIteration2Probes = new List<GameObject>(iteration2Probes); // Creates a list for storing over time all iteration 2 probes
-        allIteration2Probes.Add(parentProbe); // Appends the parent probe to the stored ones
+        List<GameObject> allIteration2Probes = new List<GameObject>(iteration2Probes);
+        allIteration2Probes.Add(parentProbe);
 
-        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(iteration2Positions); // Clone iteration 2 map to be able to extend it without impact on the original
+        Dictionary<GameObject, Vector3> allIteration2Positions = new Dictionary<GameObject, Vector3>(parentProbeToIteration2Positions[parentProbeIndex]);
         if (gridRebuildManager.probeOriginalPositions.ContainsKey(parentProbe))
         {
             allIteration2Positions[parentProbe] = gridRebuildManager.probeOriginalPositions[parentProbe];
@@ -290,65 +279,39 @@ public class IterationManager : MonoBehaviour
         probeDots.probeInitialPositions = allIteration2Positions;
         probeDots.selectedProbeIndex = -1;
 
-        currentIteration = 2;
-        currentParentProbeIndex = parentProbeIndex;
+        // Reset motion tracking when entering iteration 2 (if in ViveMotion mode)
+        if (probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+        {
+            vrInputHandler.ResetMotionTracking();
+        }
     }
 
-    // METHOD: Progress to iteration 2 after enter interaction
+    // METHOD: Advances from 1st iteration to 2nd iteration
     private void AdvanceToIteration2(int parentProbeIndex)
     {
-        if (parentProbeIndex < 0 || parentProbeIndex >= iterationProbes[1].Count) // Safety: Avoids execution in case of invalid probe dot indexing
-        {
-            return;
-        }
+        currentIteration = 2;
+        currentParentProbeIndex = parentProbeIndex;
 
-        GameObject selectedProbe = iterationProbes[1][parentProbeIndex];
+        GameObject selectedProbe = probeDots.probes[parentProbeIndex];
 
-        if (selectedProbe == null) // Safety: Avoids execution in case the probe dots don't exist
-        {
-            return;
-        }
-
-        Vector3 newCenterPosition = selectedProbe.transform.position;
-
-        HideIteration1ProbesExcept(selectedProbe); 
-
-        UpdateProbeInfluenceRadius(selectedProbe, 1);
+        HideIteration1ProbesExcept(selectedProbe);
 
         if (iterationFixationPoints.ContainsKey(1))
         {
             GameObject fixation = iterationFixationPoints[1];
-            if (fixation != null) // Safety: Proceeds ONLY if the center fixation point exists
+            if (fixation != null)
             {
-                fixation.SetActive(true);
+                fixation.SetActive(false);
                 Renderer renderer = fixation.GetComponent<Renderer>();
                 if (renderer != null)
                 {
-                    renderer.enabled = true;
+                    renderer.enabled = false;
                 }
             }
         }
 
-        SpawnIteration2Probes(newCenterPosition, parentProbeIndex);
-
-        currentIteration = 2;
-        currentParentProbeIndex = parentProbeIndex;
-
-        probeDots.selectedProbeIndex = -1;
-    }
-
-    // METHOD: Spawns the probe dots for higher iterations
-    private void SpawnIteration2Probes(Vector3 centerPosition, int parentProbeIndex)
-    {
         List<GameObject> newIteration2Probes = new List<GameObject>();
         Dictionary<GameObject, Vector3> newIteration2Positions = new Dictionary<GameObject, Vector3>();
-
-        if (gridRebuildManager == null) // Safety: Avoids execution if the deformation system doesn't exist
-        {
-            return;
-        }
-
-        GameObject selectedProbe = iterationProbes[1][parentProbeIndex];
 
         if (selectedProbe == null) // Safety: Avoids execution if the selected probe doesn't exist
         {
@@ -438,6 +401,12 @@ public class IterationManager : MonoBehaviour
         probeDots.probes = allIteration2Probes;
         probeDots.probeInitialPositions = allIteration2Positions;
         probeDots.selectedProbeIndex = -1;
+
+        // Reset motion tracking when entering iteration 2 (if in ViveMotion mode)
+        if (probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+        {
+            vrInputHandler.ResetMotionTracking();
+        }
     }
 
     // METHOD: Hides all probe dots of iteration 1 except the selected 1
@@ -536,6 +505,12 @@ public class IterationManager : MonoBehaviour
 
         currentIteration = 1;
         currentParentProbeIndex = -1;
+
+        // Reset motion tracking when returning to iteration 1 (if in ViveMotion mode)
+        if (probeDots.GetInputMethod() == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+        {
+            vrInputHandler.ResetMotionTracking();
+        }
     }
 
     // HELPER METHOD: Checks if there is iteration 2 children stored

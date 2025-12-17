@@ -52,6 +52,7 @@ public class ProbeDots : MonoBehaviour
     [SerializeField] private ProbeInputMethod inputMethod = ProbeInputMethod.Keyboard;
     [SerializeField] private float vrMovementSpeed = 1.5f;
     [SerializeField] private float vrSensitivity = 1.0f;
+    [SerializeField] private float motionGain = 50f; // Gain multiplier for motion-based displacement
 
     // Initialization of all probe dot functionalities
     void Start()
@@ -89,7 +90,8 @@ public class ProbeDots : MonoBehaviour
 
     private void InitializeVRInput()
     {
-        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        // Initialize VR input for BOTH trackpad and motion modes
+        if (inputMethod == ProbeInputMethod.ViveTrackpad || inputMethod == ProbeInputMethod.ViveMotion)
         {
             vrInputHandler = FindObjectOfType<VRInputHandler>();
 
@@ -119,7 +121,7 @@ public class ProbeDots : MonoBehaviour
         // Numpad selection works in BOTH modes
         HandleKeyboardProbeSelection();
 
-        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        if (inputMethod == ProbeInputMethod.ViveTrackpad || inputMethod == ProbeInputMethod.ViveMotion)
         {
             HandleProbeMovement();
             HandleVRTriggerComplete();
@@ -224,155 +226,34 @@ public class ProbeDots : MonoBehaviour
                 // Skip the center position
                 if (rowOffset == 0 && colOffset == 0)
                     continue;
-                
+
                 int row = centerIndex + (rowOffset * probeSpacingCells);
                 int col = centerIndex + (colOffset * probeSpacingCells);
-                
-                // Ensure positions are within valid grid bounds
-                if (row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
-                {
-                    positions.Add(new Vector2Int(col, row));
-                }
+
+                positions.Add(new Vector2Int(col, row));
             }
         }
 
         return positions;
     }
 
-    // *FUTURE* METHOD: Generate probe positions for inverse mode - To incorporate with inverse mechanism implementation
-
-    /*
-    private List<Vector2Int> GenerateInverseProbePositions(int gridSize)
-    {
-        List<Vector2Int> positions = new List<Vector2Int>();
-        
-        // STEP 1: Detect deformation intersections
-        // Find the intersection point(s) between horizontal and vertical deformations
-        // This requires access to the GridRebuildManager's deformation data
-        
-        Vector2Int deformationOrigin = DetectDeformationIntersection();
-        
-        // STEP 2: Generate probes around the deformation origin
-        // Use spacing of 2 cells in all directions
-        for (int rowOffset = -1; rowOffset <= 1; rowOffset++)
-        {
-            for (int colOffset = -1; colOffset <= 1; colOffset++)
-            {
-                // Skip the origin (intersection point)
-                if (rowOffset == 0 && colOffset == 0)
-                    continue;
-                
-                int row = deformationOrigin.y + (rowOffset * probeSpacingCells);
-                int col = deformationOrigin.x + (colOffset * probeSpacingCells);
-                
-                // STEP 3: Apply edge exclusion if enabled
-                if (excludeEdgeProbes)
-                {
-                    // Skip probes that are too close to grid edges
-                    int edgeBuffer = 1; // Minimum distance from edge
-                    if (row < edgeBuffer || row > gridSize - edgeBuffer ||
-                        col < edgeBuffer || col > gridSize - edgeBuffer)
-                    {
-                        continue;
-                    }
-                }
-                
-                // Ensure positions are within valid grid bounds
-                if (row >= 0 && row <= gridSize && col >= 0 && col <= gridSize)
-                {
-                    positions.Add(new Vector2Int(col, row));
-                }
-            }
-        }
-        
-        return positions;
-    }
-
-    // FUTURE *HELPER METHOD*: Detect the intersection of deformations
-    private Vector2Int DetectDeformationIntersection()
-    {
-        // This method will analyze the grid deformation data to find where
-        // horizontal and vertical deformations intersect
-        
-        // Placeholder: Return grid center for now
-        int centerIndex = mainGrid.GridSize / 2;
-        return new Vector2Int(centerIndex, centerIndex);
-        
-        // FUTURE IMPLEMENTATION:
-        // 1. Access GridRebuildManager's accumulatedDisplacement data
-        // 2. Analyze displacement vectors to identify primary deformation axes
-        // 3. Find the grid cell where both horizontal and vertical deformations are strongest
-        // 4. Return that cell as the origin for probe generation
-        //
-        // Example logic:
-        // - Iterate through all grid cells
-        // - Calculate horizontal displacement magnitude (x-component)
-        // - Calculate vertical displacement magnitude (y-component)
-        // - Find cell with maximum combined displacement or specific intersection criteria
-        // - Return that cell's coordinates
-    }
-    */
-
-    // METHOD: Handle probe selection via numerical pad keyboard (1-9)
+    // METHOD: Handle keyboard INPUT to select probes
     private void HandleKeyboardProbeSelection()
     {
-        KeyCode[] numpadKeys = new KeyCode[]
-        {
-            KeyCode.Keypad1, KeyCode.Keypad2, KeyCode.Keypad3,
-            KeyCode.Keypad4, KeyCode.Keypad5, KeyCode.Keypad6,
-            KeyCode.Keypad7, KeyCode.Keypad8, KeyCode.Keypad9
-        };
-
-        KeyCode[] alphaKeys = new KeyCode[]
-        {
-            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
-            KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
-            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9
-        };
-
-        bool isIteration2 = (iterationManager != null && iterationManager.CurrentIteration == 2);
-
-        for (int keyIndex = 0; keyIndex < 9; keyIndex++)
-        {
-            bool keyPressed = Input.GetKeyDown(numpadKeys[keyIndex]) || Input.GetKeyDown(alphaKeys[keyIndex]);
-
-            if (keyPressed)
-            {
-                if (!isIteration2 && keyIndex == 4)
-                {
-                    continue;
-                }
-
-                int probeIndex = GetProbeIndexFromKeyPosition(keyIndex, isIteration2);
-
-                if (probeIndex >= 0 && probeIndex < probes.Count)
-                {
-                    SelectProbe(probeIndex);
-                    return;
-                }
-            }
-        }
+        if (Input.GetKeyDown(KeyCode.Keypad1)) SelectProbe(0);
+        if (Input.GetKeyDown(KeyCode.Keypad2)) SelectProbe(1);
+        if (Input.GetKeyDown(KeyCode.Keypad3)) SelectProbe(2);
+        if (Input.GetKeyDown(KeyCode.Keypad4)) SelectProbe(3);
+        if (Input.GetKeyDown(KeyCode.Keypad5)) SelectProbe(4);
+        if (Input.GetKeyDown(KeyCode.Keypad6)) SelectProbe(5);
+        if (Input.GetKeyDown(KeyCode.Keypad7)) SelectProbe(6);
+        if (Input.GetKeyDown(KeyCode.Keypad8)) SelectProbe(7);
     }
 
-    // HELPER METHOD: Map keyboard position (0-8) to probe index based on iteration
-    private int GetProbeIndexFromKeyPosition(int keyPosition, bool isIteration2)
-    {
-        if (isIteration2)
-        {
-            int[] keyToProbeMap = { 0, 1, 2, 3, 8, 4, 5, 6, 7 };
-            return keyToProbeMap[keyPosition];
-        }
-        else
-        {
-            int[] keyToProbeMap = { 0, 1, 2, 3, -1, 4, 5, 6, 7 };
-            return keyToProbeMap[keyPosition];
-        }
-    }
-
-    // METHOD: Handle VR trigger for marking probe complete (same as Space bar)
+    // METHOD: Handle VR trigger press to mark probe as complete
     private void HandleVRTriggerComplete()
     {
-        if (inputMethod == ProbeInputMethod.ViveTrackpad)
+        if (inputMethod == ProbeInputMethod.ViveTrackpad || inputMethod == ProbeInputMethod.ViveMotion)
         {
             if (vrInputHandler != null && vrInputHandler.TriggerPressed)
             {
@@ -393,7 +274,11 @@ public class ProbeDots : MonoBehaviour
                         focusSystem.ExitFocusMode();
                     }
 
-                    Debug.Log("VR Trigger: Marked probe as complete");
+                    // Reset motion tracking when probe is completed
+                    if (inputMethod == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+                    {
+                        vrInputHandler.ResetMotionTracking();
+                    }
                 }
             }
         }
@@ -412,10 +297,9 @@ public class ProbeDots : MonoBehaviour
             Vector3 inputDirection = Vector3.zero;
 
             // Vive Trackpad displacement method
-
             if (inputMethod == ProbeInputMethod.ViveTrackpad)
             {
-                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable()) // Verification of the INPUT system being ready
+                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable())
                 {
                     if (vrInputHandler.IsTrackpadPressed)
                     {
@@ -431,8 +315,22 @@ public class ProbeDots : MonoBehaviour
                 }
             }
             
-            // Keyboard displacement method
+            // Vive Motion displacement method (NEW)
+            else if (inputMethod == ProbeInputMethod.ViveMotion)
+            {
+                if (vrInputHandler != null && vrInputHandler.IsControllerAvailable())
+                {
+                    inputDirection = vrInputHandler.GetMotionMovement(motionGain);
+                    hasInput = inputDirection.magnitude > 0.0001f;
 
+                    if (hasInput)
+                    {
+                        proposedPosition += inputDirection;
+                    }
+                }
+            }
+            
+            // Keyboard displacement method
             else if (inputMethod == ProbeInputMethod.Keyboard)
             {
                 hasInput = GetKeyboardDisplacementInput(ref inputDirection, ref proposedPosition, currentPosition);
@@ -469,7 +367,7 @@ public class ProbeDots : MonoBehaviour
         bool hasInput = false;
         float speed = moveSpeed * Time.deltaTime;
 
-        inputDirection = Vector3.zero; // FIXED: Reset inputDirection at the start
+        inputDirection = Vector3.zero;
 
         if (Input.GetKey(KeyCode.UpArrow))
         {
@@ -508,7 +406,7 @@ public class ProbeDots : MonoBehaviour
     // METHOD: Select a probe by index
     private void SelectProbe(int index)
     {
-        if (index >= probes.Count) return; // Safety: If the index of the probe is out of range, exit.
+        if (index >= probes.Count) return;
 
         // Deselect previous probe and restore to 'initial' state coloring
         if (selectedProbeIndex >= 0 && selectedProbeIndex < probes.Count)
@@ -519,6 +417,12 @@ public class ProbeDots : MonoBehaviour
         // Select new probe and change to 'selected' state coloring
         selectedProbeIndex = index;
         probes[selectedProbeIndex].GetComponent<Renderer>().material.color = ProbeColors.Selected;
+
+        // Reset motion tracking when a new probe is selected
+        if (inputMethod == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+        {
+            vrInputHandler.ResetMotionTracking();
+        }
     }
 
     private void DeselectAllProbes()
@@ -536,7 +440,6 @@ public class ProbeDots : MonoBehaviour
         probeNeighbors.Clear();
 
         // Define neighbor relationships
-
         probeNeighbors[0] = new List<int> { 1, 2, 3, 5 };           
         probeNeighbors[1] = new List<int> { 0, 2, 3, 4, 6 };        
         probeNeighbors[2] = new List<int> { 0, 1, 4, 7 };           
@@ -559,7 +462,6 @@ public class ProbeDots : MonoBehaviour
                 if (neighborIndex >= 0 && neighborIndex < probes.Count)
                 {
                     GameObject neighborProbe = probes[neighborIndex];
-                    // Use current position to prevent overlap with displaced neighbors
                     neighborPositions.Add(neighborProbe.transform.position);
                 }
             }
@@ -582,11 +484,17 @@ public class ProbeDots : MonoBehaviour
     // METHOD: Change INPUT method at runtime
     public void SetInputMethod(ProbeInputMethod method)
     {
-        inputMethod = method; // FIXED: Changed from ProbeInputMethod = method
+        inputMethod = method;
 
-        if (method == ProbeInputMethod.ViveTrackpad && vrInputHandler == null)
+        if ((method == ProbeInputMethod.ViveTrackpad || method == ProbeInputMethod.ViveMotion) && vrInputHandler == null)
         {
             InitializeVRInput();
+        }
+
+        // Reset motion tracking when switching to ViveMotion mode
+        if (method == ProbeInputMethod.ViveMotion && vrInputHandler != null)
+        {
+            vrInputHandler.ResetMotionTracking();
         }
     }
 
