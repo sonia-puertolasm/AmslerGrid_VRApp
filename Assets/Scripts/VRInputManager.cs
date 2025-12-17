@@ -28,7 +28,7 @@ public class VRInputHandler : MonoBehaviour
     private Vector3 lastControllerPosition;
     private bool motionTrackingInitialized = false;
     public Vector3 MotionDelta { get; private set; }
-    private float motionDeadzone = 0.001f; // Small movements are ignored
+    private float motionDeadzone = 0.001f;
 
     // Initialization
     void Start()
@@ -156,17 +156,14 @@ public class VRInputHandler : MonoBehaviour
         {
             if (!motionTrackingInitialized)
             {
-                // Initialize tracking on first valid read
                 lastControllerPosition = currentPosition;
                 motionTrackingInitialized = true;
                 MotionDelta = Vector3.zero;
             }
             else
             {
-                // Calculate position delta from last frame
                 Vector3 rawDelta = currentPosition - lastControllerPosition;
 
-                // Apply deadzone to filter out tiny jitters
                 if (rawDelta.magnitude < motionDeadzone)
                 {
                     rawDelta = Vector3.zero;
@@ -201,10 +198,6 @@ public class VRInputHandler : MonoBehaviour
         if (MotionDelta.magnitude < motionDeadzone)
             return Vector3.zero;
 
-        // Map controller motion to screen space
-        // X-axis: horizontal movement (left/right)
-        // Y-axis: vertical movement (up/down)
-        // We ignore Z-axis (forward/backward) for 2D displacement
         return new Vector3(
             MotionDelta.x * gain,
             MotionDelta.y * gain,
