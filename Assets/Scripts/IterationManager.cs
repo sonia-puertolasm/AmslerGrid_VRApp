@@ -137,8 +137,8 @@ public class IterationManager : MonoBehaviour
             }
         }
 
-        // Center trackpad click: Confirm probe displacement (same as Space bar)
-        if (vrInputHandler.IsTrackpadCenterPressed)
+        // Both grips pressed: Confirm probe displacement (same as Space bar)
+        if (vrInputHandler.BothGripsPressed)
         {
             HandleSpaceBar(); // Mark probe as completed
         }

@@ -17,6 +17,10 @@ public class VRInputHandler : MonoBehaviour
 
     // Button state properties
     public bool TriggerPressed { get; private set; }
+    public bool BothGripsPressed { get; private set; } // NEW: Both grips on active controller pressed
+
+    // Grip button state tracking for the active controller
+    private bool bothGripsWerePressed = false;
 
     // Fine-tuning specific properties for controller use
     private float deadzone = 0.15f; // Threshold to ignore tiny axis movements possible from the trackpad
@@ -47,6 +51,7 @@ public class VRInputHandler : MonoBehaviour
         }
         ReadTrackpadInput();
         ReadTriggerInput();
+        ReadGripInput(); // NEW: Read grip button states
     }
 
     // METHOD: Identifies a usable XR controller each frame
@@ -165,6 +170,36 @@ public class VRInputHandler : MonoBehaviour
             TriggerPressed = triggerIsPressed && !triggerWasPressed;
             triggerWasPressed = triggerIsPressed;
         }
+    }
+
+    // METHOD: Reads the input of grip buttons on the active controller
+    // Detects when both sides of the grip are pressed (full squeeze)
+    private void ReadGripInput()
+    {
+        if (!controllerFound || !activeController.isValid)
+        {
+            BothGripsPressed = false;
+            return;
+        }
+
+        bool fullGripPressed = false;
+
+        // Try analog grip value first (more reliable for detecting full squeeze)
+        float gripValue;
+        if (activeController.TryGetFeatureValue(CommonUsages.grip, out gripValue))
+        {
+            // Full grip squeeze (both sides) typically gives values > 0.9
+            fullGripPressed = gripValue > 0.9f;
+        }
+        // Fallback to grip button if analog not available
+        else if (activeController.TryGetFeatureValue(CommonUsages.gripButton, out bool gripButton))
+        {
+            fullGripPressed = gripButton;
+        }
+
+        // Detect "just pressed" when full grip is engaged (like Input.GetKeyDown)
+        BothGripsPressed = fullGripPressed && !bothGripsWerePressed;
+        bothGripsWerePressed = fullGripPressed;
     }
 
     // METHOD: Extract movement direction
