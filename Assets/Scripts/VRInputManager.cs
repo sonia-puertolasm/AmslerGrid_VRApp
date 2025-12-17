@@ -192,7 +192,7 @@ public class VRInputHandler : MonoBehaviour
         );
     }
 
-    // METHOD: Extract movement from controller motion (for ViveMotion mode)
+    // METHOD: Extract movement from controller motion
     public Vector3 GetMotionMovement(float gain = 1f)
     {
         if (MotionDelta.magnitude < motionDeadzone)
@@ -205,7 +205,7 @@ public class VRInputHandler : MonoBehaviour
         );
     }
 
-    // METHOD: Reset motion tracking (useful when switching probes or modes)
+    // METHOD: Reset motion tracking
     public void ResetMotionTracking()
     {
         motionTrackingInitialized = false;

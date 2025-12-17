@@ -212,7 +212,6 @@ public class ProbeDots : MonoBehaviour
     }
 
     // METHOD: Generate probe positions for standard mode (from center, spacing of 2)
-
     private List<Vector2Int> GenerateStandardProbePositions(int gridSize)
     {
         List<Vector2Int> positions = new List<Vector2Int>();
@@ -315,7 +314,7 @@ public class ProbeDots : MonoBehaviour
                 }
             }
             
-            // Vive Motion displacement method (NEW)
+            // Vive Motion displacement method
             else if (inputMethod == ProbeInputMethod.ViveMotion)
             {
                 if (vrInputHandler != null && vrInputHandler.IsControllerAvailable())
