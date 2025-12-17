@@ -123,7 +123,7 @@ public class ProbeDots : MonoBehaviour
         {
             // VR MODE: Controller input for movement only
             // Trigger is handled by IterationManager for iteration navigation
-            // Both grips pressed is handled by IterationManager for probe completion
+            // Trackpad double-click is handled by IterationManager for probe completion
             HandleProbeMovement();
         }
         else

@@ -137,8 +137,8 @@ public class IterationManager : MonoBehaviour
             }
         }
 
-        // Both grips pressed: Confirm probe displacement (same as Space bar)
-        if (vrInputHandler.BothGripsPressed)
+        // Trackpad double-click: Confirm probe displacement (same as Space bar)
+        if (vrInputHandler.TrackpadDoubleClicked)
         {
             HandleSpaceBar(); // Mark probe as completed
         }

@@ -12,15 +12,10 @@ public class VRInputHandler : MonoBehaviour
     // Trackpad state specific properties
     public Vector2 TrackpadInput { get; private set; }
     public bool IsTrackpadPressed { get; private set; }
-    public bool IsTrackpadCenterPressed { get; private set; }
-    float centerClickRadius = 0.3f; // How close to the center counts as center
+    public bool TrackpadDoubleClicked { get; private set; } // Double-click event for confirmation
 
     // Button state properties
     public bool TriggerPressed { get; private set; }
-    public bool BothGripsPressed { get; private set; } // NEW: Both grips on active controller pressed
-
-    // Grip button state tracking for the active controller
-    private bool bothGripsWerePressed = false;
 
     // Fine-tuning specific properties for controller use
     private float deadzone = 0.15f; // Threshold to ignore tiny axis movements possible from the trackpad
@@ -29,6 +24,11 @@ public class VRInputHandler : MonoBehaviour
 
     // State tracking for button detection
     private bool triggerWasPressed = false;
+    private bool trackpadWasPressed = false;
+
+    // Double-click detection
+    private float lastClickTime = 0f;
+    private float doubleClickThreshold = 0.3f; // Maximum time between clicks (in seconds)
 
     // Initialization of all methods
     void Start()
@@ -51,17 +51,13 @@ public class VRInputHandler : MonoBehaviour
         }
         ReadTrackpadInput();
         ReadTriggerInput();
-        ReadGripInput(); // NEW: Read grip button states
     }
 
     // METHOD: Identifies a usable XR controller each frame
     private void InitializeController()
     {
-        UnityEngine.Debug.Log("VRInputHandler: Looking for controllers...");
-
         var devices = new List<InputDevice>();
         InputDevices.GetDevices(devices);
-        UnityEngine.Debug.Log($"VRInputHandler: Total devices found: {devices.Count}");
 
         // Right controller
         InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
@@ -88,47 +84,49 @@ public class VRInputHandler : MonoBehaviour
         controllerFound = false;
     }
 
-    // METHOD: Reads input of the trackpad (PRESS and center detection)
+    // METHOD: Reads input of the trackpad (PRESS for movement and DOUBLE-CLICK for confirmation)
     private void ReadTrackpadInput()
     {
         if (!controllerFound || !activeController.isValid)
         {
             IsTrackpadPressed = false;
-            IsTrackpadCenterPressed = false;
+            TrackpadDoubleClicked = false;
             TrackpadInput = Vector2.zero;
             smoothedInput = Vector2.zero;
             return;
         }
 
-        bool wasPressed = IsTrackpadPressed; // Store previous state
+        // Reset double-click flag at the start of each frame
+        TrackpadDoubleClicked = false;
 
         // Check if trackpad is pressed
         bool pressed;
         if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out pressed))
         {
             IsTrackpadPressed = pressed;
-        }
-
-        // Detect center click: pressed while position is near center
-        if (IsTrackpadPressed && !wasPressed) // Just pressed this frame
-        {
-            Vector2 clickPosition = Vector2.zero;
-            if (activeController.TryGetFeatureValue(CommonUsages.primary2DAxis, out clickPosition))
+            
+            // Detect click (just pressed this frame)
+            bool clickedThisFrame = pressed && !trackpadWasPressed;
+            
+            if (clickedThisFrame)
             {
-                // Check if click position is near center
-                if (clickPosition.magnitude < centerClickRadius)
+                float currentTime = Time.time;
+                float timeSinceLastClick = currentTime - lastClickTime;
+                
+                // Check if this is a double-click
+                if (timeSinceLastClick <= doubleClickThreshold)
                 {
-                    IsTrackpadCenterPressed = true;
+                    TrackpadDoubleClicked = true;
+                    lastClickTime = 0f; // Reset to prevent triple-click detection
                 }
                 else
                 {
-                    IsTrackpadCenterPressed = false;
+                    // This is the first click, record the time
+                    lastClickTime = currentTime;
                 }
             }
-        }
-        else
-        {
-            IsTrackpadCenterPressed = false;
+            
+            trackpadWasPressed = pressed;
         }
 
         // Only read trackpad position for movement if it's pressed
@@ -170,36 +168,6 @@ public class VRInputHandler : MonoBehaviour
             TriggerPressed = triggerIsPressed && !triggerWasPressed;
             triggerWasPressed = triggerIsPressed;
         }
-    }
-
-    // METHOD: Reads the input of grip buttons on the active controller
-    // Detects when both sides of the grip are pressed (full squeeze)
-    private void ReadGripInput()
-    {
-        if (!controllerFound || !activeController.isValid)
-        {
-            BothGripsPressed = false;
-            return;
-        }
-
-        bool fullGripPressed = false;
-
-        // Try analog grip value first (more reliable for detecting full squeeze)
-        float gripValue;
-        if (activeController.TryGetFeatureValue(CommonUsages.grip, out gripValue))
-        {
-            // Full grip squeeze (both sides) typically gives values > 0.9
-            fullGripPressed = gripValue > 0.9f;
-        }
-        // Fallback to grip button if analog not available
-        else if (activeController.TryGetFeatureValue(CommonUsages.gripButton, out bool gripButton))
-        {
-            fullGripPressed = gripButton;
-        }
-
-        // Detect "just pressed" when full grip is engaged (like Input.GetKeyDown)
-        BothGripsPressed = fullGripPressed && !bothGripsWerePressed;
-        bothGripsWerePressed = fullGripPressed;
     }
 
     // METHOD: Extract movement direction
