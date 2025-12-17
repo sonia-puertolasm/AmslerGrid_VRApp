@@ -131,7 +131,7 @@ public class IterationManager : MonoBehaviour
         }
 
         // Double trigger press: Confirm + navigate iterations
-        if (vrInputHandler.TriggerDoubleClicked)
+        if (vrInputHandler.TriggerDoublePressed)
         {
             HandleSpaceBar(); // First, mark probe as completed
             
@@ -145,6 +145,7 @@ public class IterationManager : MonoBehaviour
             }
         }
     }
+
     // HELPER METHOD: Manages the interaction given enter key engagement
     private void HandleEnterKey()
     {

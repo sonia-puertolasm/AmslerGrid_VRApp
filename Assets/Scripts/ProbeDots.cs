@@ -122,8 +122,8 @@ public class ProbeDots : MonoBehaviour
         if (inputMethod == ProbeInputMethod.ViveTrackpad)
         {
             // VR MODE: Controller input for movement only
-            // Single trigger press: Confirm probe (handled by IterationManager)
-            // Double trigger press: Confirm + navigate iteration (handled by IterationManager)
+            // Single trigger: Confirm probe (handled by IterationManager)
+            // Double trigger: Confirm + navigate iteration (handled by IterationManager)
             HandleProbeMovement();
         }
         else

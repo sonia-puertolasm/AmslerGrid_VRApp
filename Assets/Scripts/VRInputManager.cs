@@ -14,22 +14,24 @@ public class VRInputHandler : MonoBehaviour
     public bool IsTrackpadPressed { get; private set; }
 
     // Button state properties
-    public bool TriggerPressed { get; private set; } // Single trigger press
-    public bool TriggerDoubleClicked { get; private set; } // Double trigger press
+    public bool TriggerPressed { get; private set; }        // Single trigger press
+    public bool TriggerDoublePressed { get; private set; }  // Double trigger press
 
     // Fine-tuning specific properties for controller use
-    private float deadzone = 0.15f; // Threshold to ignore tiny axis movements possible from the trackpad
-    private float smoothing = 0.7f; // Dampening factor for steadier motion
-    private Vector2 smoothedInput; // Vector for smoothing of input
+    private float deadzone = 0.15f;
+    private float smoothing = 0.7f;
+    private Vector2 smoothedInput;
 
     // State tracking for trigger detection
     private bool triggerWasPressed = false;
-    private float lastTriggerPressTime = 0f;
-    private float triggerDoubleClickThreshold = 0.3f; // Maximum time between trigger presses
-    private float triggerPressTime = 0f;
-    private float quickTriggerThreshold = 0.2f; // Maximum hold time to count as a "click"
+    private float triggerPressStartTime = 0f;
+    private float lastTriggerReleaseTime = 0f;
+    
+    // Double-press thresholds
+    private float quickPressThreshold = 0.2f;      // Max hold time to count as a "press"
+    private float doublePressWindow = 0.3f;        // Max time between presses for double-press
 
-    // Initialization of all methods
+    // Initialization
     void Start()
     {
         StartCoroutine(DelayedInitialize());
@@ -52,38 +54,36 @@ public class VRInputHandler : MonoBehaviour
         ReadTriggerInput();
     }
 
-    // METHOD: Identifies a usable XR controller each frame
+    // METHOD: Identifies a usable XR controller
     private void InitializeController()
     {
         var devices = new List<InputDevice>();
         InputDevices.GetDevices(devices);
 
-        // Right controller
+        // Try right controller first
         InputDevice rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
-        
         if (rightController.isValid)
         {
             activeController = rightController;
             controllerFound = true;
-            UnityEngine.Debug.Log("VR Input: Controller detected (RIGHT)");
+            UnityEngine.Debug.Log("VR Input: RIGHT controller detected");
             return;
         }
 
-        // Left controller
+        // Try left controller
         InputDevice leftController = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
-        
         if (leftController.isValid)
         {
             activeController = leftController;
             controllerFound = true;
-            UnityEngine.Debug.Log("VR Input: Controller detected (LEFT)");
+            UnityEngine.Debug.Log("VR Input: LEFT controller detected");
             return;
         }
 
         controllerFound = false;
     }
 
-    // METHOD: Reads input of the trackpad (PRESS + MOVE for displacement)
+    // METHOD: Reads trackpad input (PRESS + MOVE for displacement)
     private void ReadTrackpadInput()
     {
         if (!controllerFound || !activeController.isValid)
@@ -124,53 +124,56 @@ public class VRInputHandler : MonoBehaviour
         }
     }
 
-    // METHOD: Reads the input of the trigger button (single and double press)
+    // METHOD: Reads trigger input (single and double press detection)
     private void ReadTriggerInput()
     {
         if (!controllerFound || !activeController.isValid)
         {
             TriggerPressed = false;
-            TriggerDoubleClicked = false;
+            TriggerDoublePressed = false;
             return;
         }
 
-        // Reset flags at start of frame
+        // Reset flags each frame
         TriggerPressed = false;
-        TriggerDoubleClicked = false;
+        TriggerDoublePressed = false;
 
         bool triggerIsPressed;
         if (activeController.TryGetFeatureValue(CommonUsages.triggerButton, out triggerIsPressed))
         {
-            // Track when trigger is first pressed
+            // Detect press start
             if (triggerIsPressed && !triggerWasPressed)
             {
-                triggerPressTime = Time.time;
+                triggerPressStartTime = Time.time;
             }
             
-            // Track when trigger is released
+            // Detect release
             if (!triggerIsPressed && triggerWasPressed)
             {
-                float holdDuration = Time.time - triggerPressTime;
+                float holdDuration = Time.time - triggerPressStartTime;
                 
-                // Only count as a "press" if it was a quick pull-and-release
-                if (holdDuration < quickTriggerThreshold)
+                // Only count as a "press" if it was quick (not a long hold)
+                if (holdDuration < quickPressThreshold)
                 {
-                    float timeSinceLastPress = Time.time - lastTriggerPressTime;
+                    float timeSinceLastRelease = Time.time - lastTriggerReleaseTime;
                     
                     // Check if this is a double-press
-                    if (timeSinceLastPress <= triggerDoubleClickThreshold)
+                    if (timeSinceLastRelease <= doublePressWindow && lastTriggerReleaseTime > 0f)
                     {
-                        TriggerDoubleClicked = true;
-                        lastTriggerPressTime = 0f; // Reset to prevent triple-press detection
-                        UnityEngine.Debug.Log("VR Input: TRIGGER DOUBLE-PRESS DETECTED!");
+                        TriggerDoublePressed = true;
+                        lastTriggerReleaseTime = 0f; // Reset to prevent triple-press
                     }
                     else
                     {
-                        // This is a single press
+                        // Single press detected
                         TriggerPressed = true;
-                        lastTriggerPressTime = Time.time; // Record for potential double-press
-                        UnityEngine.Debug.Log("VR Input: Trigger single press");
+                        lastTriggerReleaseTime = Time.time;
                     }
+                }
+                else
+                {
+                    // Long hold - reset double-press detection
+                    lastTriggerReleaseTime = 0f;
                 }
             }
             
@@ -178,10 +181,10 @@ public class VRInputHandler : MonoBehaviour
         }
     }
 
-    // METHOD: Extract movement direction
+    // METHOD: Extract movement direction from trackpad
     public Vector3 GetMovementDirection(float sensitivity = 1f)
     {
-        if (!IsTrackpadPressed) // Safety: Returns null if the trackpad is not pressed
+        if (!IsTrackpadPressed)
             return Vector3.zero;
 
         return new Vector3(
@@ -191,7 +194,7 @@ public class VRInputHandler : MonoBehaviour
         );
     }
 
-    // HELPER METHOD: Assesses availability of controller
+    // HELPER METHOD: Check if controller is available
     public bool IsControllerAvailable() 
     {
         return controllerFound && activeController.isValid;
