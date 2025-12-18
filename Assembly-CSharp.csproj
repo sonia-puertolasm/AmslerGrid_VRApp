@@ -63,6 +63,7 @@
     <Compile Include="Assets\EyeTracking\EyeTrackers\DummyEyeTracker.cs" />
     <Compile Include="Assets\Scripts\IterationManager.cs" />
     <Compile Include="Assets\Scripts\VRInputManager.cs" />
+    <Compile Include="Assets\Scripts\DeformationTemplate.cs" />
     <Compile Include="Assets\EyeTracking\EyeTrackers\ViveEyeTracker.cs" />
     <Compile Include="Assets\EyeTracking.cs" />
     <Compile Include="Assets\Scripts\ProbeDotConstraints.cs" />
@@ -75,6 +76,7 @@
     <Compile Include="Assets\EyeTracking\EyeTrackingToolbox.cs" />
     <Compile Include="Assets\Scripts\DisplacementTracker.cs" />
     <Compile Include="Assets\Scripts\GridRebuildManager.cs" />
+    <Compile Include="Assets\Scripts\InverseModeManager.cs" />
     <Compile Include="Assets\Scripts\GridSpawn.cs" />
   </ItemGroup>
   <ItemGroup>

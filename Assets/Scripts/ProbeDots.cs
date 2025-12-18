@@ -26,6 +26,7 @@ public class ProbeDots : MonoBehaviour
     private FocusSystem focusSystem;
     private IterationManager iterationManager;
     private VRInputHandler vrInputHandler;
+    private InverseModeManager inverseModeManager;
 
     // Definition of configuration parameters for probe dots (they were previously generated)
     internal float probeDotSize = 0.2f; // Size of each probe dot
@@ -33,7 +34,6 @@ public class ProbeDots : MonoBehaviour
     internal float probeSpacing = 0f; // Spacing between probes
 
     // Probe dot generation settings
-    [SerializeField] private ProbeGenerationMode generationMode = ProbeGenerationMode.Standard;
     private int probeSpacingCells = 2;
 
     // private bool excludeEdgeProbes = false; - To incorporate with inverse mechanism implementation
@@ -80,6 +80,9 @@ public class ProbeDots : MonoBehaviour
 
         // Initialize iteration manager reference
         iterationManager = FindObjectOfType<IterationManager>();
+
+        // Initialize inverse mode manager reference
+        inverseModeManager = FindObjectOfType<InverseModeManager>();
 
         // Initialize VR INPUT handler if required
         InitializeVRInput();
@@ -150,15 +153,17 @@ public class ProbeDots : MonoBehaviour
 
         // Define the 8 probe positions
         List<Vector2Int> probeGridPositions = new List<Vector2Int>(); // Grid indices for probe placement
-        
+
+        // Automatically determine generation mode based on InverseModeManager
+        ProbeGenerationMode generationMode = GetGenerationMode();
+
         if (generationMode == ProbeGenerationMode.Standard)
         {
             probeGridPositions = GenerateStandardProbePositions(gridSize);
         }
-
         else if (generationMode == ProbeGenerationMode.Inverse)
         {
-            return; // - To incorporate with inverse mechanism implementation
+            probeGridPositions = GenerateInverseProbePositions(gridSize);
         }
 
         foreach (var pos in probeGridPositions) // Loop through each defined probe position
@@ -236,17 +241,45 @@ public class ProbeDots : MonoBehaviour
         return positions;
     }
 
+    // METHOD: Generate probe positions for inverse mode (matches numpad spatial layout)
+    private List<Vector2Int> GenerateInverseProbePositions(int gridSize)
+    {
+        List<Vector2Int> positions = new List<Vector2Int>();
+
+        int centerIndex = gridSize / 2;
+        
+        // Bottom row (numpad 1, 2, 3)
+        positions.Add(new Vector2Int(centerIndex - probeSpacingCells, centerIndex - probeSpacingCells)); // 1: Bottom-left
+        positions.Add(new Vector2Int(centerIndex, centerIndex - probeSpacingCells));                      // 2: Bottom-center
+        positions.Add(new Vector2Int(centerIndex + probeSpacingCells, centerIndex - probeSpacingCells)); // 3: Bottom-right
+        
+        // Middle row (numpad 4, 6 - skip 5 which is center fixation)
+        positions.Add(new Vector2Int(centerIndex - probeSpacingCells, centerIndex));                     // 4: Middle-left
+        positions.Add(new Vector2Int(centerIndex + probeSpacingCells, centerIndex));                     // 6: Middle-right
+        
+        // Top row (numpad 7, 8, 9)
+        positions.Add(new Vector2Int(centerIndex - probeSpacingCells, centerIndex + probeSpacingCells)); // 7: Top-left
+        positions.Add(new Vector2Int(centerIndex, centerIndex + probeSpacingCells));                      // 8: Top-center
+        positions.Add(new Vector2Int(centerIndex + probeSpacingCells, centerIndex + probeSpacingCells)); // 9: Top-right
+
+        return positions;
+    }
+
     // METHOD: Handle keyboard INPUT to select probes
     private void HandleKeyboardProbeSelection()
     {
-        if (Input.GetKeyDown(KeyCode.Keypad1)) SelectProbe(0);
-        if (Input.GetKeyDown(KeyCode.Keypad2)) SelectProbe(1);
-        if (Input.GetKeyDown(KeyCode.Keypad3)) SelectProbe(2);
-        if (Input.GetKeyDown(KeyCode.Keypad4)) SelectProbe(3);
-        if (Input.GetKeyDown(KeyCode.Keypad5)) SelectProbe(4);
-        if (Input.GetKeyDown(KeyCode.Keypad6)) SelectProbe(5);
-        if (Input.GetKeyDown(KeyCode.Keypad7)) SelectProbe(6);
-        if (Input.GetKeyDown(KeyCode.Keypad8)) SelectProbe(7);
+        // Automatically determine generation mode based on InverseModeManager
+        ProbeGenerationMode generationMode = GetGenerationMode();
+
+        // Both modes use the same numpad mapping (matching spatial layout, skipping 5 for center fixation)
+        if (Input.GetKeyDown(KeyCode.Keypad1)) SelectProbe(0);  // Bottom-left
+        if (Input.GetKeyDown(KeyCode.Keypad2)) SelectProbe(1);  // Bottom-center
+        if (Input.GetKeyDown(KeyCode.Keypad3)) SelectProbe(2);  // Bottom-right
+        if (Input.GetKeyDown(KeyCode.Keypad4)) SelectProbe(3);  // Middle-left
+        if (Input.GetKeyDown(KeyCode.Keypad6)) SelectProbe(4);  // Middle-right
+        if (Input.GetKeyDown(KeyCode.Keypad7)) SelectProbe(5);  // Top-left
+        if (Input.GetKeyDown(KeyCode.Keypad8)) SelectProbe(6);  // Top-center
+        if (Input.GetKeyDown(KeyCode.Keypad9)) SelectProbe(7);  // Top-right
     }
 
     // METHOD: Handle VR trigger press to mark probe as complete
@@ -263,7 +296,7 @@ public class ProbeDots : MonoBehaviour
                     Renderer renderer = selectedProbe.GetComponent<Renderer>();
                     if (renderer != null)
                     {
-                        renderer.material.color = ProbeColors.Completed; // Turn probe GREEN
+                        renderer.material.color = ProbeColors.Completed;
                     }
                     selectedProbeIndex = -1; // Deselect the probe
 
@@ -501,5 +534,15 @@ public class ProbeDots : MonoBehaviour
     public ProbeInputMethod GetInputMethod()
     {
         return inputMethod;
+    }
+
+    // METHOD: Automatically determine generation mode based on InverseModeManager
+    private ProbeGenerationMode GetGenerationMode()
+    {
+        if (inverseModeManager != null && inverseModeManager.inverseModeEnabled)
+        {
+            return ProbeGenerationMode.Inverse;
+        }
+        return ProbeGenerationMode.Standard;
     }
 }
