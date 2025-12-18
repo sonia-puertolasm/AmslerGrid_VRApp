@@ -238,19 +238,7 @@ public class IterationManager : MonoBehaviour
 
         HideIteration1ProbesExcept(parentProbe);
 
-        if (iterationFixationPoints.ContainsKey(1))
-        {
-            GameObject fixation = iterationFixationPoints[1];
-            if (fixation != null)
-            {
-                fixation.SetActive(false);
-                Renderer renderer = fixation.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    renderer.enabled = false;
-                }
-            }
-        }
+        // Keep center fixation point visible during iteration 2
 
         List<GameObject> iteration2Probes = parentProbeToIteration2Probes[parentProbeIndex];
         foreach (GameObject probe in iteration2Probes)
@@ -296,19 +284,7 @@ public class IterationManager : MonoBehaviour
 
         HideIteration1ProbesExcept(selectedProbe);
 
-        if (iterationFixationPoints.ContainsKey(1))
-        {
-            GameObject fixation = iterationFixationPoints[1];
-            if (fixation != null)
-            {
-                fixation.SetActive(false);
-                Renderer renderer = fixation.GetComponent<Renderer>();
-                if (renderer != null)
-                {
-                    renderer.enabled = false;
-                }
-            }
-        }
+        // Keep center fixation point visible during iteration 2
 
         List<GameObject> newIteration2Probes = new List<GameObject>();
         Dictionary<GameObject, Vector3> newIteration2Positions = new Dictionary<GameObject, Vector3>();
