@@ -98,26 +98,27 @@ public class InverseModeManager : MonoBehaviour
     {
         if (gridRebuildManager == null || probeDots == null) return;
         
-        // Store template displacements for all grid points
+        // Store template displacements for all grid points WITH CONSTRAINTS
         int pointCount = gridSize + 1;
         for (int row = 0; row < pointCount; row++)
         {
             for (int col = 0; col < pointCount; col++)
             {
-                Vector3 displacement = deformationTemplate.GetDisplacement(col, row);
-                gridPointTemplateDisplacements[new Vector2Int(col, row)] = displacement;
+                Vector3 rawDisplacement = deformationTemplate.GetDisplacement(col, row);
+                Vector3 constrainedDisplacement = ConstrainDisplacementToTopology(rawDisplacement, col, row, pointCount);
+                gridPointTemplateDisplacements[new Vector2Int(col, row)] = constrainedDisplacement;
             }
         }
         
-        // Apply template distortion to accumulated displacement array in GridRebuildManager
+        // Apply constrained template distortion to accumulated displacement array in GridRebuildManager
         if (gridRebuildManager.accumulatedDisplacement != null)
         {
             for (int row = 0; row < pointCount; row++)
             {
                 for (int col = 0; col < pointCount; col++)
                 {
-                    Vector3 templateDisp = deformationTemplate.GetDisplacement(col, row);
-                    gridRebuildManager.accumulatedDisplacement[row, col] = templateDisp;
+                    Vector3 constrainedDisp = gridPointTemplateDisplacements[new Vector2Int(col, row)];
+                    gridRebuildManager.accumulatedDisplacement[row, col] = constrainedDisp;
                 }
             }
         }
@@ -130,8 +131,8 @@ public class InverseModeManager : MonoBehaviour
             // Get probe's grid position
             Vector2Int probeGridPos = gridRebuildManager.GetProbeGridCell(probe);
             
-            // Get template displacement for this position
-            Vector3 templateDisp = deformationTemplate.GetDisplacement(probeGridPos);
+            // Get constrained template displacement for this position
+            Vector3 templateDisp = gridPointTemplateDisplacements[probeGridPos];
             
             // Store the template displacement for this probe
             templateDisplacements[probe] = templateDisp;
@@ -155,6 +156,76 @@ public class InverseModeManager : MonoBehaviour
             gridRebuildManager.enableDeformation = false;
             gridRebuildManager.enableDeformation = wasEnabled;
         }
+    }
+    
+    // Constrain displacement to maintain grid topology (prevents lines from crossing)
+    private Vector3 ConstrainDisplacementToTopology(Vector3 rawDisplacement, int col, int row, int pointCount)
+    {
+        Vector3 originalPos = GetTrueOriginalPosition(new Vector2Int(col, row));
+        Vector3 proposedPos = originalPos + rawDisplacement;
+        
+        float maxDisplacementFactor = 0.45f;
+        Vector3 constrainedDisplacement = rawDisplacement;
+        
+        if (col > 0)
+        {
+            Vector3 neighborOriginalPos = GetTrueOriginalPosition(new Vector2Int(col - 1, row));
+            float midpointX = (originalPos.x + neighborOriginalPos.x) / 2f;
+            float maxLeftX = midpointX - (cellSize * 0.05f);
+            
+            if (proposedPos.x < maxLeftX)
+            {
+                float maxDisp = maxLeftX - originalPos.x;
+                constrainedDisplacement.x = Mathf.Max(constrainedDisplacement.x, maxDisp);
+            }
+        }
+        
+        if (col < pointCount - 1)
+        {
+            Vector3 neighborOriginalPos = GetTrueOriginalPosition(new Vector2Int(col + 1, row));
+            float midpointX = (originalPos.x + neighborOriginalPos.x) / 2f;
+            float maxRightX = midpointX + (cellSize * 0.05f);
+            
+            if (proposedPos.x > maxRightX)
+            {
+                float maxDisp = maxRightX - originalPos.x;
+                constrainedDisplacement.x = Mathf.Min(constrainedDisplacement.x, maxDisp);
+            }
+        }
+        
+        if (row > 0)
+        {
+            Vector3 neighborOriginalPos = GetTrueOriginalPosition(new Vector2Int(col, row - 1));
+            float midpointY = (originalPos.y + neighborOriginalPos.y) / 2f;
+            float maxDownY = midpointY - (cellSize * 0.05f);
+            
+            if (proposedPos.y < maxDownY)
+            {
+                float maxDisp = maxDownY - originalPos.y;
+                constrainedDisplacement.y = Mathf.Max(constrainedDisplacement.y, maxDisp);
+            }
+        }
+        
+        if (row < pointCount - 1)
+        {
+            Vector3 neighborOriginalPos = GetTrueOriginalPosition(new Vector2Int(col, row + 1));
+            float midpointY = (originalPos.y + neighborOriginalPos.y) / 2f;
+            float maxUpY = midpointY + (cellSize * 0.05f);
+            
+            if (proposedPos.y > maxUpY)
+            {
+                float maxDisp = maxUpY - originalPos.y;
+                constrainedDisplacement.y = Mathf.Min(constrainedDisplacement.y, maxDisp);
+            }
+        }
+        
+        float maxMagnitude = cellSize * maxDisplacementFactor;
+        if (constrainedDisplacement.magnitude > maxMagnitude)
+        {
+            constrainedDisplacement = constrainedDisplacement.normalized * maxMagnitude;
+        }
+        
+        return constrainedDisplacement;
     }
     
     // Get template displacement for a grid position
